@@ -17,3 +17,8 @@ Implementation of master's thesis
 
 
     Note: In arrays where zeros are added, we will remove the zeros when decoding. The problem is that the model will learn from these zeros that do not give information. In case there are a large number of consecutive zeros and then the model adds new notes, the composition should end there.
+
+
+Useful links:
+
+1. https://www.tensorflow.org/tutorials/audio/music_generation
