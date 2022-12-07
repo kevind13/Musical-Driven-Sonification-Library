@@ -17,3 +17,4 @@ def transpose_midi_file(midi_file, notes, save=Optional[bool]):
         output_midi.tracks.append(new_track)
         if save:
             output_midi.save('./output_files/exported_midi.mid')
+    return output_midi
