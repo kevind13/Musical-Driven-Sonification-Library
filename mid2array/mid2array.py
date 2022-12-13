@@ -1,5 +1,10 @@
 import string
 import numpy as np
+import mido
+import os
+from utils.list_files import list_of_files
+from scipy import sparse
+
 
 def msg2dict(msg):
     '''
@@ -65,23 +70,46 @@ def mid2arry(mid, min_msg_pct=0.1):
     '''
 
     tracks_len = [len(tr) for tr in mid.tracks]
-    print('Track len is:', tracks_len)
     min_n_msg = max(tracks_len) * min_msg_pct
     # convert each track to nested list
     all_arys = []
     for i in range(len(mid.tracks)):
         if len(mid.tracks[i]) > min_n_msg:
             ary_i = track2seq(mid.tracks[i])
-            print(f'Sum of notes in track {i}:', np.sum(ary_i))
             all_arys.append(ary_i)
     # make all nested list the same length
     max_len = max([len(ary) for ary in all_arys])
     for i in range(len(all_arys)):
         if len(all_arys[i]) < max_len:
             all_arys[i] += [[0 for _ in range(88)] for _ in range(max_len - len(all_arys[i]))]
-    all_arys = np.array(all_arys)
+    all_arys = np.array(all_arys, np.uint8)
     all_arrays = all_arys.max(axis=0)
     # trim: remove consecutive 0s in the beginning and at the end
     sums = all_arrays.sum(axis=1)
     ends = np.where(sums > 0)[0]
     return all_arrays[min(ends):max(ends)], all_arys
+
+
+def create_all_arrays(path):
+    list_of_midi_files = list_of_files(path)
+    number_of_midi_files = len(list_of_midi_files)
+    np_path = 'midi_np_dataset'
+    np_4d_path = 'midi_4d_np_dataset'
+    if not os.path.exists(np_path):
+        os.makedirs(np_path)
+    if not os.path.exists(np_4d_path):
+        os.makedirs(np_4d_path)
+    for index, midi_file in enumerate(list_of_midi_files):
+        dir_name = midi_file.split('/')[-1].split('.')[0]
+        file_name_np = f'{np_path}/{dir_name}.npz'
+        file_name_np_4d = f'{np_4d_path}/{dir_name}.npz'
+
+        tmp_midi = mido.MidiFile(midi_file)
+        midi_array, _ = mid2arry(tmp_midi)
+
+        sparse_midi_array = sparse.csr_matrix(midi_array)
+        sparse.save_npz(file_name_np, sparse_midi_array)
+        # sparse.save_npz(file_name_np_4d, sparse_midi_array)
+        print(f'Successfully saved {midi_file}, progression: {index+1}/{number_of_midi_files}')
+        break
+        # TODO Continue with all process, but i need to know if this is necesary

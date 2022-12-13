@@ -1,6 +1,7 @@
 import numpy as np
 import mido
 
+
 def array2mid(ary, tempo=500000):
     '''
         Convert numpy array to MIDI file.
