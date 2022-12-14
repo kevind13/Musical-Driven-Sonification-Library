@@ -4,4 +4,4 @@ def get_tempo(mid):
             if msg.type == 'set_tempo':
                 return msg.tempo
     else:
-        return 500000
+        return None

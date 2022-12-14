@@ -2,7 +2,7 @@ import numpy as np
 import mido
 
 
-def array2mid(ary, tempo=500000):
+def array2mid(ary, tempo=None):
     '''
         Convert numpy array to MIDI file.
     '''
@@ -13,7 +13,9 @@ def array2mid(ary, tempo=500000):
     mid_new = mido.MidiFile()
     track = mido.MidiTrack()
     mid_new.tracks.append(track)
-    track.append(mido.MetaMessage('set_tempo', tempo=tempo, time=0))
+    if tempo:
+        track.append(mido.MetaMessage('set_tempo', tempo=tempo, time=0))
+    # track.append(mido.MetaMessage('time_signature', numerator=4, denominator=4, clocks_per_click=24, notated_32nd_notes_per_beat=8, time=0))
     # add difference in the empty track
     last_time = 0
     for ch in changes:
