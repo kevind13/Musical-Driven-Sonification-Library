@@ -1,4 +1,5 @@
 import string
+from typing import Optional
 import numpy as np
 import mido
 import os
@@ -48,7 +49,7 @@ def get_new_state(new_msg, last_state):
     return [new_state, new_msg['time']]
 
 
-def track2seq(track):
+def track2seq(track, bins: Optional[int] = None):
     '''
         Converts each message in a track to a list of 88 values, and stores each list in the result list in order.
         
@@ -59,12 +60,15 @@ def track2seq(track):
     for i in range(1, len(track)):
         new_state, new_time = get_new_state(track[i], last_state)
         if new_time > 0:
-            result += [last_state] * new_time
+            replicate_time = new_time
+            if bins:
+                replicate_time = replicate_time // bins
+            result += [last_state] * replicate_time
         last_state, last_time = new_state, new_time
     return result
 
 
-def mid2arry(mid, min_msg_pct=0.1):
+def mid2arry(mid, min_msg_pct=0.1, bins: Optional[int] = None):
     '''
         Convert MIDI file to numpy array
     '''
@@ -73,9 +77,10 @@ def mid2arry(mid, min_msg_pct=0.1):
     min_n_msg = max(tracks_len) * min_msg_pct
     # convert each track to nested list
     all_arys = []
+
     for i in range(len(mid.tracks)):
         if len(mid.tracks[i]) > min_n_msg:
-            ary_i = track2seq(mid.tracks[i])
+            ary_i = track2seq(mid.tracks[i], bins)
             all_arys.append(ary_i)
     # make all nested list the same length
     max_len = max([len(ary) for ary in all_arys])
