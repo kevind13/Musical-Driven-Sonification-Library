@@ -1,7 +1,8 @@
 import mido
 import math
 
-from utils.list_files import list_of_files
+from utils.list_files import list_of_files, list_of_files_no_depth
+from utils.statistics import draw_histogram, find_max_non_outlier
 
 def get_tempo(mid):
     for track in mid.tracks:
@@ -50,7 +51,7 @@ def gcd_and_min_delta(midi_path):
     return math.gcd(*list_of_gcd), min(list_of_min_deltas)
 
 def gcd_from_list_of_midi(midi_directory):
-    list_of_paths = list_of_files(midi_directory)
+    list_of_paths = list_of_files_no_depth(midi_directory)
     list_of_gcd = []
     for midi_file in list_of_paths:
         try: 
@@ -60,9 +61,11 @@ def gcd_from_list_of_midi(midi_directory):
             print(midi_file)
     return math.gcd(*list_of_gcd)
 
-def max_len_of_midi(midi_directory):
-    list_of_paths = list_of_files(midi_directory)
+def len_histogram_of_midi(midi_directory):
+    list_of_paths = list_of_files_no_depth(midi_directory)
     max_len = float('-inf')
+    list_of_lenghts = []
+    max_file = ''
     for midi_path in list_of_paths:
         try: 
             mid = mido.MidiFile(midi_path)
@@ -74,7 +77,11 @@ def max_len_of_midi(midi_directory):
                         tmp_len += track[i].time
                 tmp_max_len=max(tmp_max_len, tmp_len)
                 
-            max_len = max(max_len, tmp_max_len)
-        except:
-            print(midi_path)
-    return(max_len)
+            list_of_lenghts.append((tmp_max_len, midi_path))
+        except Exception as e:
+            print(midi_path, e)
+    
+    draw_histogram([x[0] for x in list_of_lenghts])
+    max_non_outlier = find_max_non_outlier([x[0] for x in list_of_lenghts])
+    max_len, max_file = max(list_of_lenghts)
+    return(max_len, max_file, max_non_outlier)
