@@ -55,6 +55,20 @@ def gcd_and_min_delta(midi_path):
     list_of_gcd, list_of_min_deltas = zip(*gcd_and_min_delta_values.values())
     return math.gcd(*list_of_gcd), min(list_of_min_deltas)
 
+def notes_domain_midi(midi_path):
+    mid = mido.MidiFile(midi_path)
+
+    max_note, min_note = float('-inf'), float('inf')
+
+    for track in mid.tracks:
+        for i, event in enumerate(track):
+            if 'note=' in str(event):
+                tmp_note = event.note
+                max_note = max(max_note, tmp_note)
+                min_note = min(min_note, tmp_note)
+
+    return max_note, min_note
+
 
 def gcd_from_list_of_midi(midi_directory):
     list_of_paths = list_of_files_no_depth(midi_directory)
@@ -66,6 +80,18 @@ def gcd_from_list_of_midi(midi_directory):
         except:
             print(midi_file)
     return math.gcd(*list_of_gcd)
+
+
+def notes_domain_from_list_of_midi(midi_directory):
+    list_of_paths = list_of_files_no_depth(midi_directory)
+    max_note, min_note = float('-inf'), float('inf')
+    for midi_file in list_of_paths:
+        try:
+            tmp_max, tmp_min = notes_domain_midi(midi_file)
+            max_note, min_note = max(max_note, tmp_max),  min(min_note, tmp_min)
+        except:
+            print(midi_file)
+    return max_note, min_note, max_note - min_note
 
 
 def len_histogram_of_midi(midi_directory):

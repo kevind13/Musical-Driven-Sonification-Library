@@ -10,3 +10,7 @@ Implementation of master's thesis
     [] Determine the domain (i.e., the set of notes used) in all the MIDI files.
     [] Convert the arrays back to MIDI format and truncate the notes as needed.
     [] Convert the arrays back to MIDI format and truncate or pad them with zeros to match a specific dimension.
+
+## Questions
+
+- What should be done if a note is 88 and it is desired to transpose it to 5 more notes?
