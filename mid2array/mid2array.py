@@ -29,36 +29,50 @@ def msg2dict(msg):
     return [result, on_]
 
 
-def switch_note(last_state, note, velocity, on_=True):
+def switch_note(last_state, note, velocity, on_=True, truncate_range: Optional[tuple[int, int]] = None):
     '''
         Changes the last_state (the state of the 88 note at the previous time step) based on new value of note, velocity, note on or note off. 
         The state of each time step contains 88 values.
         
         Piano has 88 notes, corresponding to note id 21 to 108, any note out of this range will be ignored
+        If truncate_range is not None then the range will be different, i.e, 38 to 80.
     '''
-    result = [0 for _ in range(88)] if last_state is None else last_state.copy()
-    if 21 <= note <= 108:
-        result[note - 21] = velocity if on_ else 0
+    notes_range = 88
+    bottom_value = 21
+    top_value = 108
+    if truncate_range is not None:
+        notes_range = truncate_range[1] - truncate_range[0]
+        bottom_value = truncate_range[0]
+        top_value = truncate_range[1]
+
+    result = [0 for _ in range(notes_range)] if last_state is None else last_state.copy()
+    if bottom_value <= note <= top_value:
+        result[note - bottom_value] = velocity if on_ else 0
     return result
 
 
-def get_new_state(new_msg, last_state):
+def get_new_state(new_msg, last_state, truncate_range: Optional[tuple[int, int]] = None):
     new_msg, on_ = msg2dict(str(new_msg))
-    new_state = switch_note(last_state, note=new_msg['note'], velocity=new_msg['velocity'],
-                            on_=on_) if on_ is not None else last_state
+    new_state = switch_note(
+        last_state, note=new_msg['note'], velocity=new_msg['velocity'], on_=on_,
+        truncate_range=truncate_range) if on_ is not None else last_state
     return [new_state, new_msg['time']]
 
 
-def track2seq(track, bins: Optional[int] = None):
+def track2seq(track, bins: Optional[int] = None, truncate_range: Optional[tuple[int, int]] = None):
     '''
         Converts each message in a track to a list of 88 values, and stores each list in the result list in order.
         
         Piano has 88 notes, corresponding to note id 21 to 108, any note out of the id range will be ignored
     '''
     result = []
-    last_state, last_time = get_new_state(str(track[0]), [0] * 88)
+    notes_range = 88
+    if truncate_range is not None:
+        notes_range = truncate_range[1] - truncate_range[0]
+
+    last_state, last_time = get_new_state(str(track[0]), [0] * notes_range)
     for i in range(1, len(track)):
-        new_state, new_time = get_new_state(track[i], last_state)
+        new_state, new_time = get_new_state(track[i], last_state, truncate_range=truncate_range)
         if new_time > 0:
             replicate_time = new_time
             if bins:
@@ -68,7 +82,7 @@ def track2seq(track, bins: Optional[int] = None):
     return result
 
 
-def mid2arry(mid, min_msg_pct=0.1, bins: Optional[int] = None):
+def mid2arry(mid, min_msg_pct=0.1, bins: Optional[int] = None, truncate_range: Optional[tuple[int, int]] = None, fixed_len: Optional[int] = None):
     '''
         Convert MIDI file to numpy array
     '''
@@ -80,19 +94,22 @@ def mid2arry(mid, min_msg_pct=0.1, bins: Optional[int] = None):
 
     for i in range(len(mid.tracks)):
         if len(mid.tracks[i]) > min_n_msg:
-            ary_i = track2seq(mid.tracks[i], bins)
+            ary_i = track2seq(mid.tracks[i], bins=bins, truncate_range=truncate_range)
             all_arys.append(ary_i)
+    max_len = fixed_len if fixed_len is not None else max([len(ary) for ary in all_arys])
+    notes_range = 88
+    if truncate_range is not None:
+        notes_range = truncate_range[1] - truncate_range[0]
     # make all nested list the same length
-    max_len = max([len(ary) for ary in all_arys])
     for i in range(len(all_arys)):
         if len(all_arys[i]) < max_len:
-            all_arys[i] += [[0 for _ in range(88)] for _ in range(max_len - len(all_arys[i]))]
+            all_arys[i] += [[0 for _ in range(notes_range)] for _ in range(max_len - len(all_arys[i]))]
+        elif len(all_arys[i]) > max_len:
+            all_arys[i] = all_arys[i][:max_len]
+
     all_arys = np.array(all_arys, np.uint8)
     all_arrays = all_arys.max(axis=0)
-    # trim: remove consecutive 0s in the beginning and at the end
-    sums = all_arrays.sum(axis=1)
-    ends = np.where(sums > 0)[0]
-    return all_arrays[min(ends):max(ends)], all_arys
+    return all_arrays, all_arys
 
 
 def create_all_arrays(path):
