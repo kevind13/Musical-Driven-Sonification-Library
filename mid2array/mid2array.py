@@ -64,7 +64,7 @@ def get_new_state(new_msg, last_state, truncate_range: Optional[tuple[int, int]]
     return [new_state, new_msg['time']]
 
 
-def track2seq(track, bins: Optional[int] = None, truncate_range: Optional[tuple[int, int]] = None):
+def track2seq(track, block_size: Optional[int] = None, truncate_range: Optional[tuple[int, int]] = None):
     '''
         Converts each message in a track to a list of 88 values, and stores each list in the result list in order.
         
@@ -77,7 +77,7 @@ def track2seq(track, bins: Optional[int] = None, truncate_range: Optional[tuple[
     for msg in track[1:]:
         new_state, new_time = get_new_state(msg, last_state, truncate_range=truncate_range)
         if new_time > 0:
-            replicate_time = new_time // bins if bins else new_time
+            replicate_time = new_time // block_size if block_size else new_time
             result += [last_state] * replicate_time
         last_state, last_time = new_state, new_time
     return result
@@ -85,7 +85,7 @@ def track2seq(track, bins: Optional[int] = None, truncate_range: Optional[tuple[
 
 def mid2arry(mid,
              min_msg_pct=0.1,
-             bins: Optional[int] = None,
+             block_size: Optional[int] = None,
              truncate_range: Optional[tuple[int, int]] = None,
              fixed_len: Optional[int] = None):
     '''
@@ -99,7 +99,7 @@ def mid2arry(mid,
     all_arys = []
     for tr in mid.tracks:
         if len(tr) > min_n_msg:
-            ary = track2seq(tr, bins=bins, truncate_range=truncate_range)
+            ary = track2seq(tr, block_size=block_size, truncate_range=truncate_range)
             all_arys.append(ary)
 
     max_len = fixed_len if fixed_len is not None else max([len(ary) for ary in all_arys])
