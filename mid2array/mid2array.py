@@ -87,7 +87,8 @@ def mid2arry(mid,
              min_msg_pct=0.1,
              block_size: Optional[int] = None,
              truncate_range: Optional[tuple[int, int]] = None,
-             fixed_len: Optional[int] = None):
+             fixed_len: Optional[int] = None,
+             truncate_length: Optional[bool] = None):
     '''
         Convert MIDI file to numpy array
     '''
@@ -110,6 +111,7 @@ def mid2arry(mid,
         if len(ary) < max_len:
             ary += [[0] * notes_range for _ in range(max_len - len(ary))]
         elif len(ary) > max_len:
+            assert not (truncate_length == False and fixed_len is not None), 'This file is greater than max_len and can not be truncated.'
             ary = ary[:max_len]
 
     all_arys = np.array(all_arys, np.uint8)
