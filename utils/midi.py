@@ -97,7 +97,7 @@ def notes_range_from_list_of_midi(midi_directory):
 def len_histogram_of_midi(midi_directory):
     list_of_paths = list_of_files_no_depth(midi_directory)
     max_len = float('-inf')
-    list_of_lenghts = []
+    list_of_lengths = []
     max_file = ''
     for midi_path in list_of_paths:
         try:
@@ -110,14 +110,14 @@ def len_histogram_of_midi(midi_directory):
                         tmp_len += track[i].time
                 tmp_max_len = max(tmp_max_len, tmp_len)
 
-            list_of_lenghts.append((tmp_max_len, midi_path))
+            list_of_lengths.append((tmp_max_len, midi_path))
         except Exception as e:
             print(midi_path, e)
 
-    draw_histogram([x[0] for x in list_of_lenghts])
-    max_non_outlier = find_max_non_outlier([x[0] for x in list_of_lenghts])
-    max_len, max_file = max(list_of_lenghts)
-    min_len, min_file = min(list_of_lenghts)
+    draw_histogram([x[0] for x in list_of_lengths], title='Histogram of Length of MIDI files', x_label='Length of MIDI (ticks)', y_label='Number of MIDI files')
+    max_non_outlier = find_max_non_outlier([x[0] for x in list_of_lengths])
+    max_len, max_file = max(list_of_lengths)
+    min_len, min_file = min(list_of_lengths)
     return ({
         'max_len': max_len,
         'max_file': max_file,
