@@ -10,7 +10,7 @@ def find_max_non_outlier(list):
 
     outliers = []
     for value in list:
-        if value < mean - 3 * stdev or value > mean + 3 * stdev:
+        if value < mean - 4 * stdev or value > mean + 4 * stdev:
             outliers.append(value)
 
     max_non_outlier = None
