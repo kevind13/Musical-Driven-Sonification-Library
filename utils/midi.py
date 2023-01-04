@@ -125,3 +125,17 @@ def len_histogram_of_midi(midi_directory):
         'min_len': min_len,
         'min_file': min_file
     })
+
+
+def range_histogram_of_midi(midi_directory):
+    list_of_paths = list_of_files_no_depth(midi_directory)
+    list_of_ranges = []
+    for midi_path in list_of_paths:
+        try:
+            max_note, min_note = notes_range_midi(midi_path)
+            list_of_ranges.append((max_note, min_note))
+        except Exception as e:
+            print(midi_path, e)
+
+    draw_histogram([x[0] for x in list_of_ranges], title='Histogram of max notes of MIDI files', x_label='Max note number of MIDI files', y_label='Number of notes')
+    draw_histogram([x[1] for x in list_of_ranges], title='Histogram of min notes of MIDI files', x_label='', y_label='Min note number of MIDI files')
