@@ -6,7 +6,7 @@ Implementation of master's thesis
 
     [x] Do not use outliers, increase max_len a bit more.
     [x] histogram of ranges
-    [] Improve plotting function
+    [x] Improve plotting function
     [x] Improve histogram function
     [] Start autoencoder
  
