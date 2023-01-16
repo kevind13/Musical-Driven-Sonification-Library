@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import mido
 import os
-from utils.list_files import list_of_files
+from utils.list_files import list_of_files, list_of_files_no_depth
 from scipy import sparse
 
 
@@ -142,3 +142,26 @@ def create_all_arrays(path):
         print(f'Successfully saved {midi_file}, progression: {index+1}/{number_of_midi_files}')
         break
         # TODO Continue with all process, but i need to know if this is necesary
+
+
+def create_exploratory_row_data(path):
+    from utils.constants import MIDI_ARRAY_MAX_LEN, MIDI_BOTTOM_NOTE, MIDI_GCD_TIME, MIDI_NOTE_RANGE, MIDI_TOP_NOTE
+    from scipy.io import savemat
+
+    list_of_midi_files = list_of_files_no_depth(path)
+    number_of_midi_files = len(list_of_midi_files)
+    np_path = 'midi_np_dataset'
+    midi_arrays = []
+    if not os.path.exists(np_path):
+        os.makedirs(np_path)
+    for index, midi_file in enumerate(list_of_midi_files):
+        tmp_midi = mido.MidiFile(midi_file)
+        _, midi_array = mid2arry(tmp_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE), fixed_len=MIDI_ARRAY_MAX_LEN)
+         
+        midi_1d_array = midi_array.reshape(-1,)
+        midi_arrays.append(midi_1d_array)
+        print(midi_array.shape, midi_1d_array.shape)
+        if index == 40:
+            break
+    midi_arrays = np.array(midi_arrays)
+    savemat(f'{np_path}/exploratory_data.mat', {'train_data': midi_arrays})
