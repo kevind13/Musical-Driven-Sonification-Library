@@ -8,7 +8,14 @@ Implementation of master's thesis
     [x] histogram of ranges
     [x] Improve plotting function
     [x] Improve histogram function
-    [] Start autoencoder
- 
+    [x] Start autoencoder
+
+    [] change the data to binary
+    [] sigmoid, bceloss, batchnormalization
+    [] add validatio set
+    [] accuracy plot
+    [] loss plot
+    [] compare dense, conv, uint8 binary.
+
 ## Questions
 
