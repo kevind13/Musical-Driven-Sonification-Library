@@ -33,6 +33,7 @@ class Encoder(nn.Module):
         x = self.leaky(self.fc1(x))
         x = self.leaky(self.fc2(x))
         x = self.fc3(x)
+        x = self.zero_mean(x)
         return x
 
 
@@ -72,7 +73,7 @@ def cov_loss(z, step):
     return loss.mean()
 
 
-def train_AE(E, D, optimizer, epoch, train_data, test_loader):
+def train_AE(E, D, optimizer, epoch, train_loader, test_loader):
     train_loss = 0
     test_loss = 0
 
@@ -81,8 +82,7 @@ def train_AE(E, D, optimizer, epoch, train_data, test_loader):
     for batch_idx, (data) in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
-        z = E(data)
-        recon_data = D(z)
+        recon_data = D(E(data))
         loss = reconstruction_loss(recon_data, data)
         loss.backward()
         train_loss += loss.item()
@@ -90,18 +90,17 @@ def train_AE(E, D, optimizer, epoch, train_data, test_loader):
 
     E.eval()
     D.eval()
-
     for batch_idx, (data) in enumerate(test_loader):
         data = data.to(device)
         recon_data = D(E(data))
         loss = reconstruction_loss(recon_data, data)
         test_loss += loss.item()
 
-    print('====> AE Epoch: {}, Train loss: {:.6f}, Test loss: {:.6f}'.format(epoch, train_loss / len(train_data),
+    print('====> AE Epoch: {}, Train loss: {:.6f}, Test loss: {:.6f}'.format(epoch, train_loss / len(train_loader),
                                                                              test_loss / len(test_loader)))
 
 
-def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_loader, lambda_rec, lambda_cov, device):
+def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_loader, test_loader, lambda_rec, lambda_cov, device):
     train_loss = 0
     train_content_loss = 0.
     train_cov_loss = 0.
@@ -163,12 +162,12 @@ def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_loader, lambda_
             test_cov_loss += loss_cov
 
     print('PCAAE{} Epoch: {} Train loss: {:.6f},\t Train Data loss: {:.6f},\t Train Cov loss: {:.8f},'.format(
-        step, epoch, train_loss / len(train_dataset), train_content_loss / len(train_dataset),
-        train_cov_loss / len(train_dataset)))
+        step, epoch, train_loss / len(train_loader), train_content_loss / len(train_loader),
+        train_cov_loss / len(train_loader)))
 
     print('PCAAE{} Epoch: {} Test loss: {:.6f},\t Test Data loss: {:.6f},\t Tes Cov loss: {:.8f},'.format(
-        step, epoch, test_loss / len(test_dataset), test_content_loss / len(test_dataset),
-        test_cov_loss / len(test_dataset)))
+        step, epoch, test_loss / len(test_loader), test_content_loss / len(test_loader),
+        test_cov_loss / len(test_loader)))
 
 
 X_train = np.array(scipy.io.loadmat('exploratory_data.mat')['train_data'], dtype=np.uint8)
