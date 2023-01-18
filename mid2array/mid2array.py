@@ -165,3 +165,27 @@ def create_exploratory_row_data(path):
             break
     midi_arrays = np.array(midi_arrays)
     savemat(f'{np_path}/exploratory_data.mat', {'train_data': midi_arrays})
+
+
+def create_exploratory_4_channels_data(path):
+    from utils.constants import MIDI_ARRAY_MAX_LEN, MIDI_BOTTOM_NOTE, MIDI_GCD_TIME, MIDI_NOTE_RANGE, MIDI_TOP_NOTE
+    from scipy.io import savemat
+
+    list_of_midi_files = list_of_files_no_depth(path)
+    number_of_midi_files = len(list_of_midi_files)
+    np_path = 'midi_np_dataset'
+    midi_arrays = []
+    if not os.path.exists(np_path):
+        os.makedirs(np_path)
+    for index, midi_file in enumerate(list_of_midi_files):
+        tmp_midi = mido.MidiFile(midi_file)
+        _, midi_array = mid2arry(tmp_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE), fixed_len=MIDI_ARRAY_MAX_LEN)
+        
+        midi_array = np.transpose(midi_array, (1, 2, 0))
+        print()
+        midi_arrays.append(midi_array)
+
+        if index == 40:
+            break
+    midi_arrays = np.array(midi_arrays)
+    savemat(f'{np_path}/exploratory_4_channels_data.mat', {'train_data': midi_arrays})
