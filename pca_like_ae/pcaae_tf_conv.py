@@ -7,7 +7,7 @@ import itertools
 batchsize = 4
 gpu = True
 is_training = True
-num_epoch = 2
+num_epoch = 4
 lr = 0.001
 lambda_cov = 1
 lambda_rec = 1
@@ -33,11 +33,16 @@ class Encoder(layers.Layer):
         self.bn = layers.BatchNormalization()
 
     def call(self, x):
+        # print(x.get_shape())
         x = self.conv1(x)
+        # print(x.get_shape())
         x = self.conv2(x)
+        # print(x.get_shape())
         x = self.conv3(x)
-        z = self.bn(x)
-        return z
+        # print(x.get_shape())
+        x = self.bn(x)
+        # print(x.get_shape())
+        return x
 
 
 class Decoder(layers.Layer):
@@ -62,12 +67,29 @@ class Decoder(layers.Layer):
                                              padding='same')
         self.convT3 = layers.Conv1DTranspose(output_size, kernel_size=self.kernel_size, padding='same')
 
-    def call(self, z):
-        x = self.convT1(z)
+    def call(self, x):
+        # print(z.get_shape())
+        x = self.convT1(x)
+        # print(x.get_shape())
         x = self.convT2(x)
+        # print(x.get_shape())
         # Sigmoid activation for final conv layer
         x = self.sigmoid(self.convT3(x))
+        # print(x.get_shape())
 
+        return x
+
+
+class AutoEncoder(tf.keras.Model):
+
+    def __init__(self, encoder, decoder):
+        super(AutoEncoder, self).__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def call(self, x, training=None, **kwargs):
+        x = self.encoder(x)
+        x = self.decoder(x)
         return x
 
 
@@ -79,7 +101,6 @@ def reconstruction_loss(data, recon_data, MSE=False):
 
 
 def cov_loss(z, step):
-    print(z, step)
     if step > 1:
         loss = 0
         for idx in range(step - 1):
@@ -90,28 +111,29 @@ def cov_loss(z, step):
     return tf.reduce_mean(loss)
 
 
-def train_AE(E, D, optimizer, epoch, train_ds, test_ds):
+def train_AE(AE, optimizer, epoch, train_ds, test_ds):
     train_loss = tf.keras.metrics.Mean()
     test_loss = tf.keras.metrics.Mean()
 
     for _, data in enumerate(train_ds):
         with tf.GradientTape() as tape:
             reshaped_tensor = tf.reshape(data, [1, 1, input_size])
-            recon_data = D(E(reshaped_tensor))
+            recon_data = AE(reshaped_tensor)
             loss_value = reconstruction_loss(recon_data, data)
             print(f'\r{loss_value.numpy():.5f}', end='')
-        grads = tape.gradient(loss_value, E.trainable_variables + D.trainable_variables)
-        optimizer.apply_gradients(zip(grads, E.trainable_variables + D.trainable_variables))
+        grads = tape.gradient(loss_value, AE.trainable_variables)
+        optimizer.apply_gradients(zip(grads, AE.trainable_variables))
         train_loss.update_state(loss_value)
 
     for _, data in enumerate(test_ds):
         reshaped_tensor = tf.reshape(data, [1, 1, input_size])
-        recon_data = D(E(reshaped_tensor))
+        recon_data = AE(reshaped_tensor)
         loss_value = reconstruction_loss(recon_data, data)
         test_loss.update_state(loss_value)
 
     print('====> AE Epoch: {}, Train loss: {:.6f}, Test loss: {:.6f}'.format(epoch, train_loss.result(),
                                                                              test_loss.result()))
+    return {'train_loss': tf.keras.backend.eval(train_loss.result()), 'test_loss': tf.keras.backend.eval(test_loss.result())}
 
 
 def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_ds, test_ds):
@@ -162,11 +184,22 @@ def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_ds, test_ds):
         if step > 1:
             test_cov_loss.update_state(loss_cov)
 
+    # ADD TEST
+
     print('PCAAE{} Epoch: {} Train loss: {:.6f},\t Train Data loss: {:.6f},\t Train Cov loss: {:.8f},'.format(
         step, epoch, train_loss.result(), train_content_loss.result(), train_cov_loss.result()))
 
     print('PCAAE{} Epoch: {} Test Data loss: {:.6f},\t Test Cov loss: {:.8f},'.format(
         step, epoch, test_loss.result(), test_content_loss.result(), test_cov_loss.result()))
+
+    return {
+        'train_loss': tf.keras.backend.eval(train_loss.result()),
+        'train_content_loss': tf.keras.backend.eval(train_content_loss.result()),
+        'train_cov_loss': tf.keras.backend.eval(train_cov_loss.result()),
+        'test_loss': tf.keras.backend.eval(test_loss.result()),
+        'test_content_loss': tf.keras.backend.eval(test_content_loss.result()),
+        'test_cov_loss': tf.keras.backend.eval(test_cov_loss.result())
+    }
 
 
 X_train = np.array(scipy.io.loadmat('exploratory_data.mat')['train_data'], dtype=np.float32)
@@ -174,8 +207,9 @@ test_loader = X_train[:8]
 train_loader = X_train[8:]
 
 input_size = X_train.shape[1]
-hidden_size1 = 100
-hidden_size2 = 50
+340000
+hidden_size1 = 1000
+hidden_size2 = 32
 latent_space_dimension = 12
 
 input_shape = X_train[0].shape
@@ -192,11 +226,17 @@ testing_dataset = tf.data.Dataset.from_tensor_slices(test_loader)
 if autoencoder:
     AE_E = Encoder(input_size, hidden_size1, hidden_size2, latent_space_dimension)
     AE_D = Decoder(latent_space_dimension, hidden_size2, hidden_size1, input_size, input_shape)
+    ae = AutoEncoder(AE_E, AE_D)
 
     AE_optim = optimizers.Adam(learning_rate=lr, beta_1=0.5, beta_2=0.999)
 
+    history = {'train_loss': [], 'test_loss': []}
     for epoch in range(1, num_epoch + 1):
-        train_AE(AE_E, AE_D, AE_optim, epoch, training_dataset, testing_dataset)
+        temp_history = train_AE(ae, AE_optim, epoch, training_dataset, testing_dataset)
+        history['train_loss'].append(temp_history.get('train_loss', 0))
+        history['test_loss'].append(temp_history.get('test_loss', 0))
+        
+    print(history)
 
 else:
     PCAAE_E = []
@@ -212,7 +252,24 @@ else:
         PCAAE_E.append(PCAAE_E_i)
         PCAAE_D.append(PCAAE_D_i)
 
+    history = {
+        'train_loss': [],
+        'train_content_loss': [],
+        'train_cov_loss': [],
+        'test_loss': [],
+        'test_content_loss': [],
+        'test_cov_loss': []
+    }
+
     for model in range(1, latent_space_dimension + 1):
         optim_temp = optimizers.Adam(learning_rate=lr, beta_1=0.5, beta_2=0.999)
         for epoch in range(1, num_epoch + 1):
-            train_PCA_AE(PCAAE_E, PCAAE_D, optim_temp, epoch, model, training_dataset, testing_dataset)
+            temp_history = train_PCA_AE(PCAAE_E, PCAAE_D, optim_temp, epoch, model, training_dataset, testing_dataset)
+            history['train_loss'].append(temp_history.get('train_loss', 0))
+            history['train_content_loss'].append(temp_history.get('train_content_loss', 0))
+            history['train_cov_loss'].append(temp_history.get('tratrain_cov_lossin_loss', 0))
+            history['test_loss'].append(temp_history.get('test_loss', 0))
+            history['test_content_loss'].append(temp_history.get('test_content_loss', 0))
+            history['test_cov_loss'].append(temp_history.get('test_cov_loss', 0))
+
+
