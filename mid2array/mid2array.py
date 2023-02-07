@@ -5,6 +5,7 @@ import mido
 import os
 from utils.list_files import list_of_files, list_of_files_no_depth
 from scipy import sparse
+from utils.matrix import bin_to_int_array
 
 
 def msg2dict(msg):
@@ -167,25 +168,43 @@ def create_exploratory_row_data(path):
     savemat(f'{np_path}/exploratory_data.mat', {'train_data': midi_arrays})
 
 
-def create_exploratory_4_channels_data(path):
+def create_exploratory_4_channels_data(path, all=False):
     from utils.constants import MIDI_ARRAY_MAX_LEN, MIDI_BOTTOM_NOTE, MIDI_GCD_TIME, MIDI_NOTE_RANGE, MIDI_TOP_NOTE
     from scipy.io import savemat
 
-    list_of_midi_files = list_of_files_no_depth(path)
+    if all:
+        list_of_midi_files = list_of_files(path)
+    else: 
+        list_of_midi_files = list_of_files_no_depth(path)
+
     number_of_midi_files = len(list_of_midi_files)
+
     np_path = 'midi_np_dataset'
     midi_arrays = []
     if not os.path.exists(np_path):
         os.makedirs(np_path)
     for index, midi_file in enumerate(list_of_midi_files):
+        if '.DS_Store' in midi_file:
+            continue
         tmp_midi = mido.MidiFile(midi_file)
         _, midi_array = mid2arry(tmp_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE), fixed_len=MIDI_ARRAY_MAX_LEN)
         
+        # midi_array = bin_to_int_array(midi_array)
+ 
+        if midi_array.shape != (4,1280,68):
+            print(f'Different dimension in {midi_file}')
+            continue
+
         midi_array = np.transpose(midi_array, (1, 2, 0))
-        print()
         midi_arrays.append(midi_array)
 
-        if index == 40:
+        if index == 40 and all == False:
+            break
+        if index == 500 and all == True:
             break
     midi_arrays = np.array(midi_arrays)
-    savemat(f'{np_path}/exploratory_4_channels_data.mat', {'train_data': midi_arrays})
+    file_name = f'{np_path}/exploratory_4_channels_data_01.mat'
+    if all:
+        file_name = f'{np_path}/all_4_channels_data_01.mat'
+    
+    savemat(file_name, {'train_data': midi_arrays})
