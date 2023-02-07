@@ -16,7 +16,8 @@ def plot_midi_array(array, title: Optional[str] = None, x_label: Optional[str] =
 
     colors = ['b', 'g', 'orange', 'r']
     for i in range(array.shape[0]):
-        notes = np.multiply(np.where(array[i] > 0, 1, 0), range(1, MIDI_NOTE_RANGE + 1)).sum(axis=1)
+        notes = np.multiply(np.where(array[i] > 0, 1, 0), range(1, MIDI_NOTE_RANGE + 1)).max(axis=1)
+        print(notes)
         notes = remove_ending_zeros(notes)
         plt.plot(range(notes.shape[0]), notes, marker='_', linestyle='', color=colors[i], label=f'Track {i+1}')
 
