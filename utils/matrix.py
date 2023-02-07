@@ -29,7 +29,7 @@ def bin_to_int_array(bin_array):
             new_channel.append(byte_row)
         new_array.append(new_channel)
 
-    new_array = np.array(new_array)
+    new_array = np.array(new_array, np.uint8)
     new_array = np.transpose(new_array, (0, 2, 1))
     return new_array
 
@@ -42,6 +42,6 @@ def int_to_bit_array(int_array):
             new_channel.append(bits_row)
         new_array.append(new_channel)
 
-    new_array = np.array(new_array)
+    new_array = np.array(new_array, np.uint8)
     new_array = np.transpose(new_array, (0, 2, 1))  
     return new_array
