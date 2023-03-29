@@ -9,8 +9,6 @@ def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 12
     '''
     mid_new = mido.MidiFile()
 
-    print(ary.shape[0])
-
     for track_number in range(ary.shape[1]):
         new_ary = np.array(ary[:, track_number])
 
