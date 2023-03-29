@@ -42,7 +42,9 @@ import io
 
 dir_name = ''
 sub_dir_name = ''
-sample_rate = 48000
+sample_rate = 44100
+buffer_size = 64
+buffer_sec = (buffer_size / sample_rate)
 note_dt = 2000
 note_duration = 20000
 note_decay = 5.0 / sample_rate
@@ -89,6 +91,8 @@ c_knob = pygame.image.load(filename)
 filename = 'assets/button.png'
 button_png = pygame.image.load(filename)
 
+X_samples = np.load('PCA/samples/samples.npy')
+
 prev_mouse_pos = None
 mouse_pressed = 0
 cur_slider_ix = 0
@@ -99,9 +103,13 @@ volume = 3000
 instrument = 0
 needs_update = False
 current_params = np.zeros((1,num_params), dtype=np.float32)
+current_params_statics = np.copy(current_params)
 current_notes = np.zeros((note_h, note_w), dtype=np.uint8)
 current_midi_events = matrix2mid(current_notes.astype(int))
-current_event_index = 0
+current_midi_events = [msg for msg in current_midi_events]
+current_midi_size = len(current_midi_events) 
+current_file_index = 0
+
 cur_controls = np.array(control_inits, dtype=np.float32)
 songs_loaded = False
 
@@ -121,19 +129,51 @@ note_time_dt = 0
 audio_reset = False
 audio_pause = False
 
+next_song = False
+
 # midi_output = mido.open_output('IAC Driver Bus 1')
 
+port = mido.open_output('IAC Driver Bus 1')
 
 def audio_callback(in_data, frame_count, time_info, status):
-    global current_midi_events
+    # global current_midi_events
+    global audio_reset
+    global needs_update
+    global next_song
+    global current_file_index
 
-    port = mido.open_output('IAC Driver Bus 1')
-    out_data = current_midi_events.play()
-    midi_bytes = []
-    for msg in out_data:
+    data = np.zeros((frame_count,), dtype=np.float32)
+
+    if audio_pause and status is not None:
+        data = np.zeros((frame_count,), dtype=np.float32)
+        return data.tobytes(), pyaudio.paContinue
+    
+    if current_file_index >= current_midi_size:
+        current_file_index = 0
+        # next_song = True
+    # print(current_file_index)   
+    current_notes = []
+    dt = 0
+    for msg in current_midi_events[current_file_index:]:
+        if msg.type == 'note_on' or msg.type == 'note_off':
+            current_notes.append(msg)
+            dt += (msg.time)
+            if dt > buffer_sec:
+                current_file_index += 1
+                break
+        current_file_index += 1
+    
+    start_time = time.time()
+    input_time = 0.0
+    for msg in current_notes:
+        input_time += msg.time
+        playback_time = time.time() - start_time
+        duration_to_next_event = input_time - playback_time
         port.send(msg)
-        midi_bytes.append(msg.bytes())
-    return (b''.join(midi_bytes), pyaudio.paContinue)
+        if duration_to_next_event > 0.0:
+            time.sleep(duration_to_next_event)
+
+    return data.tobytes(), pyaudio.paContinue
 
 
 def update_mouse_click(mouse_pos):
@@ -154,15 +194,15 @@ def update_mouse_click(mouse_pos):
         cur_control_iy = int((mouse_pos[1] - (sliders_height + margin*2)) / (control_height))
         mouse_pressed = 2
 
-    x = window_width*(2.0/4.0)+margin
-    y = margin*2
-    if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
-        audio_pause = not audio_pause
+    # x = window_width*(2.0/4.0)+margin
+    # y = margin*2
+    # if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
+    #     audio_pause = not audio_pause
 
-    x = window_width*(2.0/4.0)+margin
-    y = window_height*(1 / 3.0)+margin*2
-    if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
-        sonification_mode = not sonification_mode
+    # x = window_width*(2.0/4.0)+margin
+    # y = window_height*(1 / 3.0)+margin*2
+    # if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
+    #     sonification_mode = not sonification_mode
 
 def apply_controls():
     global note_threshold
@@ -178,13 +218,14 @@ def update_mouse_move(mouse_pos):
     if mouse_pressed == 1:
         if margin <= mouse_pos[1] <= margin+slider_height:
             val = (float(mouse_pos[1]-margin) / slider_height - 0.5) * (num_sigmas * 2)
+            print({'margin': margin, 'slideR_height': slider_height, 'num_sigmas': num_sigmas, 'val': val})
             current_params[0][int(cur_slider_ix)] = val
             needs_update = True
-    elif mouse_pressed == 2:
-        if margin <= mouse_pos[0] <= margin+control_width:
-            val = float(mouse_pos[0] - margin) / control_width
-            cur_controls[int(cur_control_iy)] = val
-            apply_controls()
+    # elif mouse_pressed == 2:
+    #     if margin <= mouse_pos[0] <= margin+control_width:
+    #         val = float(mouse_pos[0] - margin) / control_width
+    #         cur_controls[int(cur_control_iy)] = val
+    #         apply_controls()
 
 # def update_with_sonification():
 #     global needs_update
@@ -340,7 +381,10 @@ def play():
     global songs_loaded
     global sonification_mode
     global current_midi_events
-    global current_event_index
+    global current_midi_size
+    global current_file_index
+    global next_song
+    global current_params_statics
      
     # global steps
 
@@ -367,6 +411,7 @@ def play():
         channels=1,
         rate=sample_rate,
         output=True,
+        frames_per_buffer=buffer_size,
         stream_callback=audio_callback)
     
     audio_stream.start_stream()
@@ -374,8 +419,7 @@ def play():
     running = True
     random_song_ix = 0
     max_random_songs = float('inf')
-    cur_len = 0
-    apply_controls()
+    # apply_controls()
 
     while running:
         # process events
@@ -405,7 +449,6 @@ def play():
                     if not songs_loaded:
                         print("Loading songs...")
                         try:
-                            X_samples = np.load('PCA/samples/samples.npy')
                             songs_loaded = True
                             max_random_songs = X_samples.shape[0]
                         except Exception as e:
@@ -418,7 +461,7 @@ def play():
 
                     if songs_loaded:
                         print("Random Song Index: " + str(random_song_ix))
-                        random_sample = X_samples[random_song_ix]
+                        random_sample = X_samples[int(random_song_ix)]
                         current_params = pca.transform([random_sample])
                         random_song_ix = (random_song_ix + 1) % max_random_songs
 
@@ -426,22 +469,36 @@ def play():
                         needs_update = True
                         audio_reset = True
 
+        if next_song: 
+            print("Random Song Index: " + str(random_song_ix))
+            random_sample = X_samples[int(random_song_ix)]
+            current_params = pca.transform([random_sample])
+            random_song_ix = (random_song_ix + 1) % max_random_songs
+            needs_update = True
+            audio_reset = True
+            next_song = False
+
         if needs_update:
             # latent_x = latent_means + np.dot(current_params * latent_pca_values, latent_pca_vectors) # REVISAR ESTO
-            print(current_params)
+            current_params_statics = np.copy(current_params)
             reconstructed_x = pca.inverse_transform(current_params)
             reconstructed_x = np.reshape(reconstructed_x*255, (128, 4))
             current_notes = np.rint(reconstructed_x)
             current_midi_events = matrix2mid(current_notes.astype(int))
-            current_event_index = 0
+            current_midi_events = [msg for msg in current_midi_events]
+            current_midi_size = len(current_midi_events) 
+            if audio_reset:
+                current_file_index = 0
+                audio_reset = False
+            current_file_index = 0
             needs_update = False
 
         screen.fill(background_color)
         draw_sliders(screen)
-        draw_controls(screen)
+        # draw_controls(screen)
         # draw_button(screen)
-        text_background(screen)
-        draw_text(screen)
+        # text_background(screen)
+        # draw_text(screen)
 
         pygame.display.flip()
         pygame.time.wait(10)
