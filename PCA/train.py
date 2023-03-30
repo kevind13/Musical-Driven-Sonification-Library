@@ -24,7 +24,7 @@ def train_PCA(y, dimension):
 
     return pca, pca_vectors, pca_values, latent_means, latent_stds
 
-def train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pca_vectors_path, dimensions, dataset_mat_path, sample_midi_vectors_path):
+def train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pca_vectors_path, dimensions, dataset_mat_path, sample_midi_vectors_path, all_principal_components_path):
     data = np.array(scipy.io.loadmat(dataset_mat_path)['train_data'], dtype=np.float32)
     shape_data = data.shape                                                               # store shape of y before reshaping it
     data = np.reshape(data,[shape_data[0],shape_data[1]*shape_data[2]])/255 
@@ -32,6 +32,11 @@ def train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pc
 
     pca, pca_vectors, pca_values, latent_means, latent_stds = train_PCA(X_train,dimensions)  
 
+    possibles_latent_spaces = [[] for _ in range(10)]    
+    for y in range(X_train.shape[0]):
+        temp_latent = pca.transform([X_train[y]])
+        for x in range(10):
+            possibles_latent_spaces[x].append(temp_latent[0][x])
 
     random_indexs = np.random.randint(low=0, high=X_train.shape[0], size=40)
     samples = X_train[random_indexs]
@@ -43,6 +48,8 @@ def train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pc
     np.save(latent_pca_vectors_path, pca_vectors)
 
     np.save(sample_midi_vectors_path, samples)
+
+    np.save(all_principal_components_path, possibles_latent_spaces)
 
     return pca
 
@@ -58,6 +65,7 @@ if __name__ == "__main__":
     parser.add_argument('--dimensions', default=DIMENSIONS, type=int, help='The number of dimensions of latent space for PCA.')
     parser.add_argument('--dataset_mat_path', default='dataset/timeseries_midi_dataset_with_transpose.mat', type=str, help='Path to .mat formatted midis dataset')
     parser.add_argument('--sample_midi_vectors_path', default='samples/samples.npy', type=str, help='Path to store some samples of midi to reproduce later.')
+    parser.add_argument('--all_principal_components_path', default='samples/principal_components.npy', type=str, help='Path to store all the pcs of the dataset (first 10).')
 
     args = parser.parse_args()
     latent_means_path = args.latent_means_path
@@ -67,7 +75,8 @@ if __name__ == "__main__":
     dimensions = args.dimensions
     dataset_mat_path = args.dataset_mat_path
     sample_midi_vectors_path = args.sample_midi_vectors_path
-    train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pca_vectors_path, dimensions, dataset_mat_path, sample_midi_vectors_path)
+    all_principal_components_path = args.all_principal_components_path
+    train(latent_means_path, latent_stds_path, latent_pca_values_path, latent_pca_vectors_path, dimensions, dataset_mat_path, sample_midi_vectors_path, all_principal_components_path)
 
 
 
