@@ -92,6 +92,12 @@ filename = 'assets/button.png'
 button_png = pygame.image.load(filename)
 
 X_samples = np.load('PCA/samples/samples.npy')
+principal_components = np.load('PCA/samples/principal_components.npy')
+pcs_distributions = []
+for x in range(principal_components.shape[0]):
+    pcs_distributions.append((np.min(principal_components[x]), np.max(principal_components[x]), np.mean(principal_components[x])))
+
+print(pcs_distributions)
 
 prev_mouse_pos = None
 mouse_pressed = 0
@@ -152,11 +158,11 @@ def audio_callback(in_data, frame_count, time_info, status):
         current_file_index = 0
         # next_song = True
     # print(current_file_index)   
-    current_notes = []
+    current_streaming_notes = []
     dt = 0
     for msg in current_midi_events[current_file_index:]:
         if msg.type == 'note_on' or msg.type == 'note_off':
-            current_notes.append(msg)
+            current_streaming_notes.append(msg)
             dt += (msg.time)
             if dt > buffer_sec:
                 current_file_index += 1
@@ -165,7 +171,7 @@ def audio_callback(in_data, frame_count, time_info, status):
     
     start_time = time.time()
     input_time = 0.0
-    for msg in current_notes:
+    for msg in current_streaming_notes:
         input_time += msg.time
         playback_time = time.time() - start_time
         duration_to_next_event = input_time - playback_time
@@ -175,6 +181,21 @@ def audio_callback(in_data, frame_count, time_info, status):
 
     return data.tobytes(), pyaudio.paContinue
 
+def map_range(value, from_range, to_range):
+    # Obtener los valores mínimos y máximos de los rangos de entrada y salida
+    from_min, from_max = from_range
+    to_min, to_max = to_range
+
+    # Convertir el valor en una fracción del rango de entrada y luego escalar esa fracción al rango de salida
+    return ((value - from_min) * (to_max - to_min) / (from_max - from_min)) + to_min
+
+def map_range_inverse(value, from_range, to_range):
+    # Obtener los valores mínimos y máximos de los rangos de entrada y salida
+    from_min, from_max = from_range
+    to_min, to_max = to_range
+
+    # Convertir el valor mapeado en una fracción del rango de salida y luego escalar esa fracción al rango de entrada
+    return ((value - to_min) * (from_max - from_min) / (to_max - to_min)) + from_min
 
 def update_mouse_click(mouse_pos):
     global cur_slider_ix
@@ -214,13 +235,15 @@ def apply_controls():
 
 def update_mouse_move(mouse_pos):
     global needs_update
+    global audio_reset
 
     if mouse_pressed == 1:
         if margin <= mouse_pos[1] <= margin+slider_height:
             val = (float(mouse_pos[1]-margin) / slider_height - 0.5) * (num_sigmas * 2)
-            print({'margin': margin, 'slideR_height': slider_height, 'num_sigmas': num_sigmas, 'val': val})
-            current_params[0][int(cur_slider_ix)] = val
+            mapped_range = map_range_inverse(val, (pcs_distributions[cur_slider_ix][0], pcs_distributions[cur_slider_ix][1]), (-5,5))
+            current_params[0][int(cur_slider_ix)] = mapped_range
             needs_update = True
+            audio_reset = True
     # elif mouse_pressed == 2:
     #     if margin <= mouse_pos[0] <= margin+control_width:
     #         val = float(mouse_pos[0] - margin) / control_width
@@ -289,7 +312,7 @@ def draw_sliders(screen):
             col = (0, 0, 0) if j - num_sigmas == 0 else slider_color
             pygame.draw.line(screen, col, (cx_1, ly), (cx_2, ly), 1)
 
-        py = y + int((current_params[0][i] / (num_sigmas * 2) + 0.5) * slider_height) - 25
+        py = y + int((map_range(current_params[0][i], (pcs_distributions[i][0], pcs_distributions[i][1]), (-5,5)) / (num_sigmas * 2) + 0.5) * slider_height) - 25
         screen.blit(knob, (int(cx-15), int(py)))
 
 # def draw_button(screen):
@@ -400,6 +423,9 @@ def play():
     pca.explained_variance_ = latent_pca_values
     pca.mean_ = latent_means
 
+    random_sample = current_notes.reshape(-1)
+
+
     pygame.init()
     pygame.mixer.init()
     pygame.font.init()
@@ -473,6 +499,7 @@ def play():
             print("Random Song Index: " + str(random_song_ix))
             random_sample = X_samples[int(random_song_ix)]
             current_params = pca.transform([random_sample])
+
             random_song_ix = (random_song_ix + 1) % max_random_songs
             needs_update = True
             audio_reset = True
@@ -486,7 +513,8 @@ def play():
             current_notes = np.rint(reconstructed_x)
             current_midi_events = matrix2mid(current_notes.astype(int))
             current_midi_events = [msg for msg in current_midi_events]
-            current_midi_size = len(current_midi_events) 
+            current_midi_size = len(current_midi_events)
+            print(current_params)
             if audio_reset:
                 current_file_index = 0
                 audio_reset = False
