@@ -108,13 +108,16 @@ def mid2arry(mid,
     notes_range = 88 if truncate_range is None else truncate_range[1] - truncate_range[0]
 
     # make all nested list the same length
-    for ary in all_arys:
-        if len(ary) < max_len:
-            ary += [[0] * notes_range for _ in range(max_len - len(ary))]
-        elif len(ary) > max_len:
+    n_shorts = 0
+    for ary in range(len(all_arys)):
+        if len(all_arys[ary]) < max_len:
+            all_arys[ary] += [[0] * notes_range for _ in range(max_len - len(ary))]
+            n_shorts+=1
+        elif len(all_arys[ary]) > max_len:
             assert not (truncate_length == False and fixed_len is not None), 'This file is greater than max_len and can not be truncated.'
-            ary = ary[:max_len]
-
+            all_arys[ary] = all_arys[ary][:max_len]
+    if n_shorts == 4:
+        raise Exception('midi to short')
     all_arys = np.array(all_arys, np.uint8)
     all_arrays = all_arys.max(axis=0)
     return all_arrays, all_arys
@@ -187,24 +190,25 @@ def create_exploratory_4_channels_data(path, all=False):
         if '.DS_Store' in midi_file:
             continue
         tmp_midi = mido.MidiFile(midi_file)
-        _, midi_array = mid2arry(tmp_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE), fixed_len=MIDI_ARRAY_MAX_LEN)
-        
+        try:
+            _, midi_array = mid2arry(tmp_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE), fixed_len=MIDI_ARRAY_MAX_LEN, truncate_length=True)
+        except Exception as e:
+            print(e)
+            continue
         # midi_array = bin_to_int_array(midi_array)
- 
-        if midi_array.shape != (4,1280,68):
+        if midi_array.shape != (4,MIDI_ARRAY_MAX_LEN,68):
             print(f'Different dimension in {midi_file}')
             continue
 
-        midi_array = np.transpose(midi_array, (1, 2, 0))
         midi_arrays.append(midi_array)
 
         if index == 40 and all == False:
             break
-        if index == 500 and all == True:
-            break
+
+        print(f'{index}/{len(list_of_midi_files)} midi:{midi_file}')
     midi_arrays = np.array(midi_arrays)
-    file_name = f'{np_path}/exploratory_4_channels_data_01.mat'
+    file_name = f'{np_path}/exploratory_4_channels_data_01_short.mat'
     if all:
-        file_name = f'{np_path}/all_4_channels_data_01.mat'
+        file_name = f'{np_path}/all_4_channels_data_01_short.mat'
     
     savemat(file_name, {'train_data': midi_arrays})
