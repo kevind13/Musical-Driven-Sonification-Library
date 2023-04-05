@@ -9,36 +9,16 @@ import argparse
 import math
 import numpy as np
 from sklearn.decomposition import PCA
+from scipy.interpolate import interp1d
+
 import pyaudio
 import time
 import pygame
 import mido
 import pandas as pd
 import io
+import threading
 
-
-# df = pd.read_csv('csv/meteorological.csv')
-# list = df.to_numpy()
-# normalized_list = np.array([])
-# steps = 0
-
-# def min_max(x, axis=None):
-#     min = x.min(axis=axis, keepdims=True)
-#     max = x.max(axis=axis, keepdims=True)
-#     result = (x-min)/(max-min)
-#     return result
-
-# for i in range(list.shape[1]-2):
-
-#     result = min_max(list[:,i+2])
-#     result = result - 0.5
-
-#     if i>0:
-#         normalized_list = np.vstack((normalized_list, result))
-#     else:
-#         normalized_list = np.append(normalized_list, result)
-
-# normalized_list = normalized_list.T
 
 dir_name = ''
 sub_dir_name = ''
@@ -72,7 +52,7 @@ window_width = 800
 window_height = 600
 margin = 20
 sliders_width = int(window_width * (2.0/4.0))
-sliders_height = int(window_height * (2.0/3.0))
+sliders_height = int(window_height * (2.5/3.0))
 slider_width = int((sliders_width-margin*2) / 5.0)
 slider_height = sliders_height-margin*2
 
@@ -94,10 +74,13 @@ button_png = pygame.image.load(filename)
 X_samples = np.load('PCA/samples/samples.npy')
 principal_components = np.load('PCA/samples/principal_components.npy')
 pcs_distributions = []
+interpolators = []
 for x in range(principal_components.shape[0]):
-    pcs_distributions.append((np.min(principal_components[x]), np.max(principal_components[x]), np.mean(principal_components[x])))
+    pcs_distributions.append((np.min(principal_components[x]), np.max(principal_components[x]), np.mean(principal_components[x]), np.std(principal_components[x])))
+    f = interp1d([-5, 0, 5], [np.min(principal_components[x]), np.mean(principal_components[x]), np.max(principal_components[x])])  #when mapping from slider to component
+    f_inv = interp1d([np.min(principal_components[x]), np.mean(principal_components[x]), np.max(principal_components[x])], [-5, 0, 5], assume_sorted=True, kind='linear', bounds_error=False) #when mapping from component to slider
+    interpolators.append((f,f_inv))
 
-print(pcs_distributions)
 
 prev_mouse_pos = None
 mouse_pressed = 0
@@ -125,7 +108,6 @@ dev_cnt = 0
 flag = 0
 flag_midi_reset = 0
 sr = 44100
-sonification_mode = False
 
 audio = pyaudio.PyAudio()
 audio_notes = []
@@ -137,49 +119,31 @@ audio_pause = False
 
 next_song = False
 
-# midi_output = mido.open_output('IAC Driver Bus 1')
-
 port = mido.open_output('IAC Driver Bus 1')
+play_thread=None
+_play=True
 
-def audio_callback(in_data, frame_count, time_info, status):
-    # global current_midi_events
-    global audio_reset
-    global needs_update
-    global next_song
-    global current_file_index
+def play_midi():    
+    while _play:
+        start_time = time.time()
+        input_time = 0.0 
+        idx=0
+        # print(" hola")
 
-    data = np.zeros((frame_count,), dtype=np.float32)
-
-    if audio_pause and status is not None:
-        data = np.zeros((frame_count,), dtype=np.float32)
-        return data.tobytes(), pyaudio.paContinue
-    
-    if current_file_index >= current_midi_size:
-        current_file_index = 0
-        # next_song = True
-    # print(current_file_index)   
-    current_streaming_notes = []
-    dt = 0
-    for msg in current_midi_events[current_file_index:]:
-        if msg.type == 'note_on' or msg.type == 'note_off':
-            current_streaming_notes.append(msg)
-            dt += (msg.time)
-            if dt > buffer_sec:
-                current_file_index += 1
-                break
-        current_file_index += 1
-    
-    start_time = time.time()
-    input_time = 0.0
-    for msg in current_streaming_notes:
-        input_time += msg.time
-        playback_time = time.time() - start_time
-        duration_to_next_event = input_time - playback_time
-        port.send(msg)
-        if duration_to_next_event > 0.0:
-            time.sleep(duration_to_next_event)
-
-    return data.tobytes(), pyaudio.paContinue
+        while idx<len(current_midi_events) and _play:
+            msg= current_midi_events[idx]
+            idx+=1
+            # print(msg)
+            input_time +=msg.time
+            playback_time = time.time() - start_time
+            duration_to_next_event = input_time - playback_time            
+            if duration_to_next_event > 0.0:
+                time.sleep(duration_to_next_event)
+            if not (msg.type == 'note_on' or msg.type == 'note_off'):
+                continue
+            else:
+                port.send(msg)
+            
 
 def map_range(value, from_range, to_range):
     # Obtener los valores mínimos y máximos de los rangos de entrada y salida
@@ -190,12 +154,17 @@ def map_range(value, from_range, to_range):
     return ((value - from_min) * (to_max - to_min) / (from_max - from_min)) + to_min
 
 def map_range_inverse(value, from_range, to_range):
-    # Obtener los valores mínimos y máximos de los rangos de entrada y salida
     from_min, from_max = from_range
     to_min, to_max = to_range
-
-    # Convertir el valor mapeado en una fracción del rango de salida y luego escalar esa fracción al rango de entrada
     return ((value - to_min) * (from_max - from_min) / (to_max - to_min)) + from_min
+
+def z_transform(value, mean, std):
+    # Perform z-score normalization manually
+    return (value - mean) / std
+
+def inverse_z_transform(value,mean,std):
+    # Perform inverse z-score normalization
+    return (value * std) + mean
 
 def update_mouse_click(mouse_pos):
     global cur_slider_ix
@@ -204,7 +173,6 @@ def update_mouse_click(mouse_pos):
 
     global cur_control_iy
     global audio_pause
-    global sonification_mode
     global slider_num
 
     if margin <= mouse_pos[0] < margin+slider_width*slider_num and margin <= mouse_pos[1] < margin+slider_height:
@@ -215,23 +183,6 @@ def update_mouse_click(mouse_pos):
         cur_control_iy = int((mouse_pos[1] - (sliders_height + margin*2)) / (control_height))
         mouse_pressed = 2
 
-    # x = window_width*(2.0/4.0)+margin
-    # y = margin*2
-    # if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
-    #     audio_pause = not audio_pause
-
-    # x = window_width*(2.0/4.0)+margin
-    # y = window_height*(1 / 3.0)+margin*2
-    # if x <= mouse_pos[0] < x+window_width*(2.0/4.0)-margin*3 and y <= mouse_pos[1] < y + window_height*(1/3.0)-margin*2:
-    #     sonification_mode = not sonification_mode
-
-def apply_controls():
-    global note_threshold
-    global note_dt
-    global volume
-
-    note_threshold = (1.0 - cur_controls[0]) * 200 + 10
-    note_dt = (1.0 - cur_controls[1]) * 1800 + 200
 
 def update_mouse_move(mouse_pos):
     global needs_update
@@ -240,52 +191,11 @@ def update_mouse_move(mouse_pos):
     if mouse_pressed == 1:
         if margin <= mouse_pos[1] <= margin+slider_height:
             val = (float(mouse_pos[1]-margin) / slider_height - 0.5) * (num_sigmas * 2)
-            mapped_range = map_range_inverse(val, (pcs_distributions[cur_slider_ix][0], pcs_distributions[cur_slider_ix][1]), (-5,5))
+            mapped_range = interpolators[cur_slider_ix][0](val)
             current_params[0][int(cur_slider_ix)] = mapped_range
             needs_update = True
             audio_reset = True
-    # elif mouse_pressed == 2:
-    #     if margin <= mouse_pos[0] <= margin+control_width:
-    #         val = float(mouse_pos[0] - margin) / control_width
-    #         cur_controls[int(cur_control_iy)] = val
-    #         apply_controls()
-
-# def update_with_sonification():
-#     global needs_update
-#     global steps
-
-#     for i in range(5):
-#         current_params[i] = float(normalized_list[steps][i]) * 10.0 * (2.5 / 5.0)
-#         needs_update = True
-
-#     steps = steps + 1
-#     if steps == list.shape[0]:
-#         steps = 0
-
-def draw_controls(screen):
-    global c_knob
-    c_knob = pygame.transform.scale(c_knob, (30, 40))
-
-    slider_color = (100, 100, 100)
-    slider_color_layer = (195, 195, 195)
-
-    for i in range(control_num):
-        x = margin + slider_width / 2 + 5
-        y = sliders_height + margin*2 + i * control_height
-        w = control_width - margin*3 - 5
-        h = int(control_height / 2.0)
-        col = control_colors[i]
-
-        pygame.draw.line(screen, slider_color_layer,
-                         (x-15, y+(h/2.0)), (x+w+15, y+(h/2.0)), 40)
-        pygame.draw.line(screen, (75, 75, 75),
-                         (x, y+(h/2.0)), (x+w, y+(h/2.0)), 4)
-
-        pygame.draw.line(screen, col,
-                         (x, y+(h/2.0)), (x+int(w * cur_controls[i])-15, y+(h/2.0)), 4)
-        screen.blit(c_knob, (x+int(w * cur_controls[i])-15, y))
-        
-
+    
 def draw_sliders(screen):
     global knob
     knob = pygame.transform.scale(knob, (30, 50))
@@ -312,29 +222,9 @@ def draw_sliders(screen):
             col = (0, 0, 0) if j - num_sigmas == 0 else slider_color
             pygame.draw.line(screen, col, (cx_1, ly), (cx_2, ly), 1)
 
-        py = y + int((map_range(current_params[0][i], (pcs_distributions[i][0], pcs_distributions[i][1]), (-5,5)) / (num_sigmas * 2) + 0.5) * slider_height) - 25
+        py = y + int((interpolators[i][1](current_params[0][i]) / (num_sigmas * 2) + 0.5) * slider_height) - 25
         screen.blit(knob, (int(cx-15), int(py)))
 
-# def draw_button(screen):
-
-#     global button_png
-#     button_play = pygame.transform.scale(
-#         button_png, (int(window_width*(2.0/4.0)-margin*2), int(window_height*(1 / 3.0)-margin*2)))
-#     button_change_mode = pygame.transform.scale(
-#         button_png, (int(window_width*(2.0/4.0)-margin*2), int(window_height*(1 / 3.0)-margin*2)))
-
-#     screen.blit(button_play, (window_width*(2.0/4.0)+margin, margin*2))
-#     screen.blit(button_change_mode, (window_width*(2.0/4.0) +
-#                 margin, window_height*(1 / 3.0)+margin*2))
-
-def text_background(screen):
-    text_background_color = (195, 195, 195)
-    x = window_width*(2.0/4.0)+margin
-    y = sliders_height + margin*2
-    w = int(window_width*(2.0/4.0)-margin*2)
-    h = int(control_height*2-margin*2)
-    background_rect = pygame.Rect(x, y, w, h)
-    pygame.draw.rect(screen, text_background_color, background_rect)
 
 def draw_text(screen):
 
@@ -348,23 +238,21 @@ def draw_text(screen):
     text_sliders = label_font.render('LATENT VALUES (TOP 5)', True, (0, 0, 0))
     screen.blit(text_sliders, (margin*2.5, margin-5))
 
-    text_threshold = label_font.render('THRESHOLD', True, (0, 0, 0))
-    screen.blit(text_threshold, (margin*2.5, sliders_height + margin+5))
-
-    text_speed = label_font.render('SPEED', True, (0, 0, 0))
-    screen.blit(text_speed, (margin*2.5, sliders_height + margin+5 + control_height))
-
 
     for i in range(slider_num):
         x = margin + i * slider_width
         y = margin*2
-        cx_2 = x + slider_width
+        cx_2 = x + slider_width - 8
 
         y1 = y + slider_height / 2.0 + (10 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y1 = int(y1)
-        text_slider_value_5 = label_font.render('-5', True, (0, 0, 0))
+        text_slider_value_5 = label_font.render(f'{pcs_distributions[i][1]:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_5.get_rect().height) / 2.0
         screen.blit(text_slider_value_5, (cx_2, y1-text_height))
+
+        current_param = label_font.render(f'{current_params[0][i]:.7f}', True, (0, 0, 0))
+        text_height = (current_param.get_rect().height) / 2.0
+        screen.blit(current_param, (cx_2-52, y1 + 30))
 
         y1 = y + slider_height / 2.0 + (5 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y1 = int(y1)
@@ -374,7 +262,7 @@ def draw_text(screen):
 
         y2 = y + slider_height / 2.0 + (0 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y2 = int(y2)
-        text_slider_value_m5 = label_font.render('5', True, (0, 0, 0))
+        text_slider_value_m5 = label_font.render(f'{pcs_distributions[i][0]:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_m5.get_rect().height) / 2.0
         screen.blit(text_slider_value_m5, (cx_2, y2-text_height))
 
@@ -402,13 +290,13 @@ def play():
     global audio_reset
     global instrument
     global songs_loaded
-    global sonification_mode
     global current_midi_events
     global current_midi_size
     global current_file_index
     global next_song
     global current_params_statics
-     
+    global play_thread
+    global _play
     # global steps
 
 
@@ -432,16 +320,8 @@ def play():
     screen = pygame.display.set_mode((int(window_width), int(window_height)))
     pygame.display.set_caption('')
 
-    audio_stream = audio.open(
-        format=audio.get_format_from_width(2),
-        channels=1,
-        rate=sample_rate,
-        output=True,
-        frames_per_buffer=buffer_size,
-        stream_callback=audio_callback)
-    
-    audio_stream.start_stream()
-
+    play_thread=threading.Thread(target=play_midi)
+    play_thread.start()
     running = True
     random_song_ix = 0
     max_random_songs = float('inf')
@@ -452,6 +332,7 @@ def play():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                _play=False
                 break
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -511,10 +392,15 @@ def play():
             reconstructed_x = pca.inverse_transform(current_params)
             reconstructed_x = np.reshape(reconstructed_x*255, (128, 4))
             current_notes = np.rint(reconstructed_x)
-            current_midi_events = matrix2mid(current_notes.astype(int))
+            try:
+                current_midi_events = matrix2mid(current_notes.astype(int))
+            except:
+                running = False
+                _play=False
+
             current_midi_events = [msg for msg in current_midi_events]
             current_midi_size = len(current_midi_events)
-            print(current_params)
+            # print(current_params)
             if audio_reset:
                 current_file_index = 0
                 audio_reset = False
@@ -524,15 +410,14 @@ def play():
         screen.fill(background_color)
         draw_sliders(screen)
         # draw_controls(screen)
-        # draw_button(screen)
         # text_background(screen)
-        # draw_text(screen)
+        draw_text(screen)
 
         pygame.display.flip()
         pygame.time.wait(10)
 
-    audio_stream.stop_stream()
-    audio_stream.close()
+    # audio_stream.stop_stream()
+    # audio_stream.close()
     audio.terminate()
 
 
