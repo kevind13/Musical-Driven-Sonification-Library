@@ -139,3 +139,25 @@ def range_histogram_of_midi(midi_directory):
 
     draw_histogram([x[0] for x in list_of_ranges], title='Histogram of max notes of MIDI files', x_label='Max note number of MIDI files', y_label='Number of notes')
     draw_histogram([x[1] for x in list_of_ranges], title='Histogram of min notes of MIDI files', x_label='', y_label='Min note number of MIDI files')
+
+
+def get_midi_key(midi_path):
+    import music21
+
+    mid = mido.MidiFile(midi_path)
+    notes = []
+    for msg in mid:
+        if msg.type == 'note_on':
+            notes.append(msg.note)
+
+    key = music21.key.Key(music21.pitch.Pitch(max(set(notes), key=notes.count)))
+    return str(key)
+
+def get_same_key_midis(midi_directory, key: str):
+    list_of_paths = list_of_files(midi_directory)
+    list_of_valid_paths = []
+    for midi_path in list_of_paths:
+        key_note  = get_midi_key(midi_path)
+        if key in key_note:
+            list_of_valid_paths.append(midi_path)
+    return list_of_valid_paths
