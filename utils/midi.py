@@ -141,10 +141,11 @@ def range_histogram_of_midi(midi_directory):
     draw_histogram([x[1] for x in list_of_ranges], title='Histogram of min notes of MIDI files', x_label='', y_label='Min note number of MIDI files')
 
 
-def get_midi_key(midi_path):
+def get_midi_key(mid, in_memory = False):
     import music21
 
-    mid = mido.MidiFile(midi_path)
+    if not in_memory:
+        mid = mido.MidiFile(mid)
     notes = []
     for msg in mid:
         if msg.type == 'note_on':
