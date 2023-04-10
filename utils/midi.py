@@ -29,9 +29,10 @@ def cosecutive_on_off(midi_path):
     return True
 
 
-def gcd_and_min_delta(midi_path):
+def gcd_and_min_delta(mid, path=True):
     import math
-    mid = mido.MidiFile(midi_path)
+    if path:
+        mid = mido.MidiFile(mid)
 
     gcd_and_min_delta_values = {}
 
