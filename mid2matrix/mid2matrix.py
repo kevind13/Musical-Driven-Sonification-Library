@@ -6,7 +6,7 @@ import os
 from utils.list_files import list_of_files, list_of_files_no_depth
 from scipy import sparse
 from utils.matrix import bin_to_int_array
-from utils.midi import get_midi_key, get_same_key_midis
+from utils.midi import gcd_and_min_delta, get_midi_key, get_same_key_midis
 
 
 def msg2dict(msg):
@@ -45,11 +45,11 @@ def track2seq(track, block_size: Optional[int] = None):
             if last_note is not None and last_note == note and on_ == last_status:
                 raise Exception('cant have two consecutive notes with same note type')
             if on_ and time != 0 and last_note != None:
-                result_seq.extend([0]*int(time/block_size))
+                result_seq.extend([0]*int((time/block_size)))
             if not on_:
                 if time is None: 
                     raise Exception('off values should have time because we are not using midis with notes at the same time')
-                result_seq.extend([note]*int(time/block_size))
+                result_seq.extend([note]*int((time/block_size)))
             last_note, last_status = note, on_
     return result_seq
 
@@ -102,9 +102,9 @@ def create_timeseries_dataset(path, key: Optional[str] =  None, transpose: Optio
         if '.DS_Store' in midi_file:
             continue
         tmp_midi = mido.MidiFile(midi_file)
-
+        block_size, _ = gcd_and_min_delta(tmp_midi, path=False)
         try:
-            midi_array = mid2matrix(tmp_midi)
+            midi_array = mid2matrix(tmp_midi, block_size=block_size)
         except Exception as e:
             print(e)
             continue
