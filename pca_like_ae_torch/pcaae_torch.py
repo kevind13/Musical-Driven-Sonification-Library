@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import warnings
+from keras.utils.np_utils import to_categorical
+
 warnings.filterwarnings('ignore')
 
 import torchvision
@@ -25,13 +27,13 @@ np.random.seed(0)
 save_training_image = False
 path_data = 'dataset'
 
-batchsize = 128
+batchsize = 256
 gpu = False
-folder4weights = 'weights'
-train_latent = 40
+folder4weights = 'weightsv6'
+train_latent = 50
 lambdacov = 1
 lambdarec = 1
-num_epoch = 100
+num_epoch = 40
 lr = 0.001
 
 if gpu:
@@ -40,8 +42,12 @@ else:
     device = torch.device("cpu")
 
 
-X_train = np.array(scipy.io.loadmat(f'{path_data}/all_4_channels_data_01_short.mat')['train_data'], dtype=np.uint8)
-X_train = np.where(X_train == 90, 1, 0)
+# X_train = np.array(scipy.io.loadmat(f'{path_data}/all_4_channels_data_01_short.mat')['train_data'], dtype=np.uint8)
+# X_train = np.array(scipy.io.loadmat(f'{path_data}/timeseries_midi_dataset_with_transpose.mat')['train_data'], dtype=np.uint8)
+X_train = np.array(scipy.io.loadmat(f'{path_data}/timeseries_midi_dataset_with_same_key.mat')['train_data'], dtype=np.uint8)
+# X_train = np.where(X_train == 90, 1, 0)
+X_train = to_categorical(X_train, num_classes=np.max(X_train)+1)
+
 X_train, X_test =train_test_split(X_train, test_size=0.2, random_state=69)
 X_train=np.array(X_train); X_test=np.array(X_test);
 
@@ -212,13 +218,14 @@ def truncated_normal(loc=0., scale=0.05, a=-1., b = 1.):
     return TruncatedNormal(loc, scale, a, b)
 
 def init_weights(m):
-    if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d:
+    if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d or type(m) == nn.Linear:
        # print("Initialisation with truncated normal !")
         truncated_normal(m.weight)
         m.bias.data.fill_(0)
 
 class Encoder(nn.Module):
-    def __init__(self, code_size=1, input_shape=(4, 256, 68)):
+    def __init__(self, code_size=1, input_shape=(128, 4, 89)):
+    # def __init__(self, code_size=1, input_shape=(128, 4, 91)):
         super(Encoder, self).__init__()        
         self.latent_dim = code_size
         self.input_shape = input_shape
@@ -226,18 +233,22 @@ class Encoder(nn.Module):
         input_size = input_shape[0] * input_shape[1] * input_shape[2]
 
         # Fully connected layers
-        self.fc1 = nn.Linear(input_size, 512)
-        self.fc2 = nn.Linear(512, code_size)
+        self.fc1 = nn.Linear(input_size, 512*20)
+        self.fc2 = nn.Linear(512*20, 512*5)
+        self.fc3 = nn.Linear(512*5, 512)
+        self.fc4 = nn.Linear(512, code_size)
 
         self.zero_mean = nn.BatchNorm1d(self.latent_dim, affine=False, eps=0)
-        self.leaky = nn.LeakyReLU(0.2)
+        self.relu = nn.ReLU()
     def forward(self, x):
         batch_size = x.size(0)
 
         x = x.view(batch_size, -1)
 
-        x = self.leaky(self.fc1(x))
-        x = self.fc2(x)
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
+        x = self.fc4(x)
         
         z = x.view((batch_size, -1))
 
@@ -245,7 +256,8 @@ class Encoder(nn.Module):
         return z  
     
 class Decoder(nn.Module):
-    def __init__(self, code_size=1, output_shape=(4, 256, 68)):
+    def __init__(self, code_size=1, output_shape=(128, 4, 89)):
+    # def __init__(self, code_size=1, output_shape=(128, 4, 91)):
         super(Decoder, self).__init__()
         # Shape required to start transpose convs
         self.output_shape = output_shape
@@ -254,16 +266,20 @@ class Decoder(nn.Module):
 
         # Fully connected layers
         self.fc1 = nn.Linear(code_size, 512)
-        self.fc2 = nn.Linear(512, output_size)
+        self.fc2 = nn.Linear(512, 512*5)
+        self.fc3 = nn.Linear(512*5, 512*20)
+        self.fc4 = nn.Linear(512*20, output_size)
 
-        self.leaky = nn.LeakyReLU(0.2)
+        self.relu = nn.ReLU()
         
     def forward(self, z):
         batch_size = z.size(0)
 
         # Fully connected layers with ReLu activations
-        x = self.leaky(self.fc1(z))
-        x = self.fc2(x)
+        x = self.relu(self.fc1(z))
+        x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
+        x = self.fc4(x)
 
         # Reshape output
         x = x.view(batch_size, *self.output_shape)
@@ -371,6 +387,59 @@ def train_PCA_AE(PCAAE_E,PCAAE_D, optimizer,
             test_content_loss / len(test_dataset), 
             test_cov_loss / len(test_dataset)))
 
+
+def train_AE(E,D, optimizer, epoch,  train_loader, device):
+    train_loss = 0      
+    test_loss = 0
+    
+    E.train()
+    D.train()
+    
+    for batch_idx, (data) in enumerate(train_loader):
+        data = data.to(device)
+        optimizer.zero_grad()
+        z = E(data)          
+        recon_data = D(z)
+        loss = reconstruction_loss(recon_data, data)
+        loss.backward()
+        train_loss += loss.item()
+        optimizer.step()
+        
+    E.eval()
+    D.eval()
+    for batch_idx, (data) in enumerate(test_loader):
+        data = data.to(device)  
+        recon_data = D(E(data))
+        loss = reconstruction_loss(recon_data, data)
+        test_loss += loss.item()
+        
+    print('====> AE Epoch: {}, Train loss: {:.6f}, Test loss: {:.6f}'
+          .format(epoch, train_loss / len(train_dataset), test_loss / len(test_dataset)))
+
+
+autoencoder = True
+if autoencoder:
+    AE_E = Encoder(code_size=130).to(device)
+    AE_D = Decoder(code_size=130).to(device)
+    AE_E.apply(init_weights)
+    AE_D.apply(init_weights)
+    AE_optim = optim.Adam(itertools.chain(AE_E.parameters(),AE_D.parameters()), lr=lr, betas=(0.5, 0.999))
+
+    
+    print("Training AE for midi files")
+    folder4weights_ae = 'weights_ae'
+    if os.path.exists(folder4weights_ae) is False:
+        os.makedirs(folder4weights_ae)
+    weightname = folder4weights_ae+'/AE_midi'
+
+    for epoch in range(1, 100):
+        train_AE(AE_E, AE_D, AE_optim, epoch, train_loader, device)
+        torch.save( {'AE_E_state_dict': AE_E.state_dict(),
+                    'AE_D_state_dict': AE_D.state_dict(),
+                    'AE_optim_state_dict': AE_optim.state_dict(),}, 
+                    weightname)  
+    assert False, 'should end here'
+
 PCAAE_E = []
 PCAAE_D = []
 for id_m in range(train_latent):  
@@ -442,7 +511,7 @@ if train_with_no_cov:
                         'PCAAE_noCov_optim_state_dict': PCAAE_optim_noCov[model-1].state_dict(),}, 
                         weightname)  
                 
-
+ 
 
 # if __name__ == "__main__":
 #     # configure parser and parse arguments
