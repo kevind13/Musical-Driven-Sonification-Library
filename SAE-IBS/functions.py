@@ -167,10 +167,7 @@ def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, de
 
     train_loader = DataLoader(torch.from_numpy(train_data), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(torch.from_numpy(val_data), batch_size=batch_size, shuffle=True)
-    ibs_val = np.diag(ref_ibs[2, 2])
-    ibs_train = np.delete(np.delete(ref_ibs, 2, axis=0), 2, axis=1)
 
-    print(ibs_val, ibs_train)
     print('Training SAEIBS...')
     if 'SAE' in type(model).__name__:
         if model.emb is None:
@@ -182,9 +179,10 @@ def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, de
                         embedding = copy.deepcopy(emb)
                     else:
                         embedding = torch.cat([embedding, emb], 0)
-                model.initialize_svd(embedding, torch.from_numpy(ibs_train).to(device))
+                model.initialize_svd(embedding)
             del x, embedding
 
+    assert False, 'Logré pasar lo del ibs'
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
