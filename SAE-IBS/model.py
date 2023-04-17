@@ -176,10 +176,11 @@ class SAEIBS(nn.Module):
         self.emb = None
         self.mean_emb = nn.Parameter(torch.empty(self.latent_dim,), requires_grad=False)
 
-    def initialize_svd(self, x, ibs_all):
-        self.emb = torch.mm(ibs_all, x)
+    def initialize_svd(self, x):
+        self.emb = x
         self.mean_emb = nn.Parameter(torch.mean(self.emb, 0))
         _, _, V = torch.svd_lowrank(self.emb - self.mean_emb, self.rank)
+        print(V)
         max_ind = torch.argmax(torch.abs(V), 0)
         colsign = torch.sign(V[max_ind, torch.arange(V.shape[1])])
         self.V = nn.Parameter(V * colsign)
