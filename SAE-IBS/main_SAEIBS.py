@@ -86,7 +86,6 @@ def main():
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.decay_step, gamma=args.lr_decay)
 
-    assert False, 'DEBO CORREGIR LO DE IBS, ESO ES GENETICO Y MIS MATRICES NO SE SI SIRVAN. SI ES POSIBLE SALTAR ESTE PASO SERIA BIEN'
     model, train_loss2, val_loss2, val_loss_min, V = run_SAEIBS(model, X_train, X_test, args.batch_size, optimizer, scheduler, device,
                                                                 args.maxNum_epochs, args.out_dir, args.patience)
 
