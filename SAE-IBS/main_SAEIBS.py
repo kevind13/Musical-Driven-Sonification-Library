@@ -15,12 +15,13 @@ from arguments import parse_args, save_args
 from keras.utils.np_utils import to_categorical
 from sklearn.model_selection import train_test_split
 
-gpu = False
+gpu = True
 if gpu:
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
 
+print('Device: ', device)
 # set deterministic
 torch.manual_seed(69)
 np.random.seed(69)
@@ -87,7 +88,9 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.decay_step, gamma=args.lr_decay)
 
     model, train_loss2, val_loss2, val_loss_min, V = run_SAEIBS(model, X_train, X_test, args.batch_size, optimizer, scheduler, device,
-                                                                args.maxNum_epochs, args.out_dir, args.patience)
+                                                                args.pretrain_epochs, args.out_dir, args.patience, loss_opt=args.loss_opt)
+    
+    assert False, 'Se supone que acá ya tengo el modelo guardadito'
 
     # Project
     group = population
