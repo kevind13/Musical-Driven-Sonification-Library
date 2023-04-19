@@ -32,7 +32,7 @@ def recon_loss(recon_x, x, loss_opt=None):
     if loss_opt =='MAE':
         recon_loss = F.l1_loss(recon_x, x, reduction='sum')
     elif loss_opt == 'BCE':
-        recon_loss = F.binary_cross_entropy(recon_x, x, reduction='sum')
+        recon_loss = F.binary_cross_entropy(recon_x, x) ##, reduction='sum')
     else:
         recon_loss = F.mse_loss(recon_x, x, reduction='sum')
     return recon_loss
@@ -72,7 +72,7 @@ def run_AE(model, train_data, val_data, batch_size, optimizer, scheduler, device
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/best_checkpoint_AE.pt', patience=num_patience, verbose=True, delta=0.1)
+    early_stopping = EarlyStopping(path=savepath + '/best_checkpoint_AE.pt', patience=num_patience, verbose=True, delta=0.00001)
 
     for epoch in range(num_epochs):
         model, train_loss = train_AE(model, train_loader, optimizer, scheduler, device, loss_opt)
@@ -92,23 +92,20 @@ def run_AE(model, train_data, val_data, batch_size, optimizer, scheduler, device
     return model, train_losses, val_losses, val_loss_min
 
 
-def run_VAE(model, inputdata, idx_val, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, variational_beta, loss_opt=None):
-    # make validation set
-    valdata = inputdata[idx_val]
-    traindata = np.delete(inputdata, idx_val, axis=0)
+def run_VAE(model, train_data, val_data, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, variational_beta, loss_opt=None):
     # load data in batch
-    traindataloader = DataLoader(MyDataset(torch.from_numpy(traindata)), batch_size=batch_size, shuffle=False)
-    valdataloader = DataLoader(MyDataset(torch.from_numpy(valdata)), batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(torch.from_numpy(train_data), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(torch.from_numpy(val_data), batch_size=batch_size, shuffle=True)
 
     print('Training AE...')
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.1)
+    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.00001)
 
     for epoch in range(num_epochs):
-        model, train_loss = train_VAE(model, traindataloader, optimizer, scheduler, device,variational_beta, loss_opt)
-        val_loss = validate_VAE(model, valdataloader, device, variational_beta, loss_opt)
+        model, train_loss = train_VAE(model, train_loader, optimizer, scheduler, device,variational_beta, loss_opt)
+        val_loss = validate_VAE(model, val_loader, device, variational_beta, loss_opt)
         print('Epoch [%d / %d] training loss: %f validation loss: %f' % (epoch + 1, num_epochs, train_loss, val_loss))
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -122,53 +119,13 @@ def run_VAE(model, inputdata, idx_val, batch_size, optimizer, scheduler, device,
     return model, train_losses, val_losses, val_loss_min
 
 
-def run_DAE(model, inputdata, idx_val, datapath_noisyRef, fname, scale_opt, cond_DAE_loss, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, epoch_noisy, beta=None):
-    # make validation set
-    valdata = inputdata[idx_val]
-    traindata = np.delete(inputdata, idx_val, axis=0)
-    # load data in batch
-    traindataloader = DataLoader(MyDataset(torch.from_numpy(traindata)), batch_size=batch_size, shuffle=False)
-    valdataloader = DataLoader(MyDataset(torch.from_numpy(valdata)), batch_size=batch_size, shuffle=False)
-
-    print('Training DAE...')
-    train_losses = []
-    val_losses = []
-    # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.1)
-
-    for epoch in range(num_epochs):
-        # feed noisy data every several epoch ==> need more early-stopping patience
-        if (epoch % epoch_noisy == 0):
-            i = int(epoch / epoch_noisy)
-            tmp_dirty1kg_dir = datapath_noisyRef + fname + '_' + str(i + 1) + '.mat'
-            geno1kg_dirty = load_data(tmp_dirty1kg_dir, fname, scale_opt)
-            valdata_dirty = geno1kg_dirty[idx_val]
-            traindata_dirty = np.delete(geno1kg_dirty, idx_val, axis=0)
-            traindataloader_dirty = DataLoader(MyDataset(torch.from_numpy(traindata_dirty)), batch_size=batch_size, shuffle=False)
-            valdataloader_dirty = DataLoader(MyDataset(torch.from_numpy(valdata_dirty)), batch_size=batch_size, shuffle=False)
-
-        model, train_loss = train_DAE(model, traindataloader, traindataloader_dirty, cond_DAE_loss, optimizer, scheduler, device, beta)
-        val_loss = validate_DAE(model, valdataloader, valdataloader_dirty, cond_DAE_loss, device, beta)
-        print('Epoch [%d / %d] training loss: %f validation loss: %f' % (epoch + 1, num_epochs, train_loss, val_loss))
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
-
-        early_stopping(val_loss, model, epoch)
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
-    checkpoint = torch.load(savepath + '/checkpoint.pt')
-    model.load_state_dict(checkpoint)
-    val_loss_min = early_stopping.val_loss_min
-    return model, train_losses, val_losses, val_loss_min
-
-
 def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, ref_ibs=None, loss_opt=None):
 
     train_loader = DataLoader(torch.from_numpy(train_data), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(torch.from_numpy(val_data), batch_size=batch_size, shuffle=True)
 
     print('Training SAEIBS...')
+
     if 'SAE' in type(model).__name__:
         if model.emb is None:
             with torch.no_grad():
@@ -182,87 +139,25 @@ def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, de
                 model.initialize_svd(embedding)
             del x, embedding
 
-    assert False, 'Logré pasar lo del ibs'
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/bestcheckpoint_SAEIBS.pt', patience=num_patience, verbose=True, delta=0.1)
+    early_stopping = EarlyStopping(path=savepath + '/bestcheckpoint_SAEIBS.pt', patience=num_patience, verbose=True, delta=0.00001)
 
     for epoch in range(num_epochs):
-        model, train_loss, V, mean_emb = train_SAEIBS(model, train_loader, optimizer, scheduler, device, ibs_train, loss_opt)
-        val_loss = validate_SAEIBS(model, val_loader, device, ibs_val, loss_opt)
+        model, train_loss, z = train_SAEIBS(model, train_loader, optimizer, scheduler, device, loss_opt)
+        val_loss = validate_SAEIBS(model, val_loader, device, loss_opt)
         print('Epoch [%d / %d] training loss: %f validation loss: %f' % (epoch + 1, num_epochs, train_loss, val_loss))
         train_losses.append(train_loss)
         val_losses.append(val_loss)
 
-        early_stopping(val_loss, model, epoch, V, mean_emb)
+        early_stopping(val_loss, model, epoch, model.V, model.mean_emb)
         if epoch % 100 == 0:
-            save_checkpoint(model, optimizer, scheduler, epoch, savepath+'/checkpoints/', V)
+            save_checkpoint(model, optimizer, scheduler, epoch, savepath+'/checkpoints/', model.V)
         if early_stopping.early_stop:
             print("Early stopping")
             break
     checkpoint = torch.load(savepath + '/bestcheckpoint_SAEIBS.pt')  # reload best checkpoint
-    model.load_state_dict(checkpoint['model_state_dict'])
-    V = checkpoint['V']
-    val_loss_min = early_stopping.val_loss_min
-    return model, train_losses, val_losses, val_loss_min, V
-
-
-def run_DSAEIBS(model, inputdata, idx_val, datapath_noisyRef, fname, scale_opt, cond_DAE_loss, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, epoch_noisy, ref_ibs=None, RefIBS_noisy=None,beta=None):
-    # make validation set
-    valdata = inputdata[idx_val]
-    ibs_val = np.diag(ref_ibs[idx_val, idx_val])
-    traindata = np.delete(inputdata, idx_val, axis=0)
-    ibs_train = np.delete(np.delete(ref_ibs, idx_val, axis=0), idx_val, axis=1)
-    # load data in batch
-    traindataloader = DataLoader(MyDataset(torch.from_numpy(traindata)), batch_size=batch_size, shuffle=False)
-    valdataloader = DataLoader(MyDataset(torch.from_numpy(valdata)), batch_size=batch_size, shuffle=False)
-
-    print('Training DSAEIBS...')
-    if 'SAE' in type(model).__name__:
-        if model.emb is None:
-            with torch.no_grad():
-                for b, (x_data, _) in enumerate(traindataloader):
-                    x = x_data.to(device)
-                    emb = model.encoder(x)
-                    if b == 0:
-                        embedding = copy.deepcopy(emb)
-                    else:
-                        embedding = torch.cat([embedding, emb], 0)
-                model.initialize_svd(embedding, torch.from_numpy(ibs_train).to(device))
-            del x, embedding
-
-    train_losses = []
-    val_losses = []
-    # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.1)
-
-    for epoch in range(num_epochs):
-        if (epoch % epoch_noisy == 0):
-            i = int(epoch / epoch_noisy)
-            tmp_dirty1kg_dir = datapath_noisyRef + fname + '_' + str(i + 1) + '.mat'
-            tmp_dirty1kgIBS_dir = datapath_noisyRef + RefIBS_noisy + '_' + str(i + 1) + '.mat'
-            geno1kg_dirty = load_data(tmp_dirty1kg_dir, fname, scale_opt)
-            ref_ibs_dirty = load_ibs(tmp_dirty1kgIBS_dir, RefIBS_noisy)
-
-            valdata_dirty = geno1kg_dirty[idx_val]
-            ibs_val_dirty = np.diag(ref_ibs_dirty[idx_val, idx_val])
-            traindata_dirty = np.delete(geno1kg_dirty, idx_val, axis=0)
-            ibs_train_dirty = np.delete(np.delete(ref_ibs_dirty, idx_val, axis=0), idx_val, axis=1)
-            traindataloader_dirty = DataLoader(MyDataset(torch.from_numpy(traindata_dirty)), batch_size=batch_size, shuffle=False)
-            valdataloader_dirty = DataLoader(MyDataset(torch.from_numpy(valdata_dirty)), batch_size=batch_size, shuffle=False)
-
-        model, train_loss, V, mean_emb = train_DSAEIBS(model, traindataloader, traindataloader_dirty, cond_DAE_loss, optimizer, scheduler, device, ibs_train,ibs_train_dirty, beta)
-        val_loss = validate_DSAEIBS(model, valdataloader, valdataloader_dirty, cond_DAE_loss, device, ibs_val, ibs_val_dirty, beta)
-        print('Epoch [%d / %d] training loss: %f validation loss: %f' % (epoch + 1, num_epochs, train_loss, val_loss))
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
-
-        early_stopping(val_loss, model, epoch, V, mean_emb)
-        if early_stopping.early_stop:
-            print('Early stopping at epoch: %d' % epoch)
-            break
-    checkpoint = torch.load(savepath + '/checkpoint.pt')  # reload best checkpoint
     model.load_state_dict(checkpoint['model_state_dict'])
     V = checkpoint['V']
     val_loss_min = early_stopping.val_loss_min
@@ -295,7 +190,7 @@ def train_VAE(model, dataloader, optimizer, scheduler, device, variational_beta,
     # set to training mode
     model.train()
     total_loss = 0
-    for b, (x_batch, ind) in enumerate(dataloader):
+    for b, (x_batch) in enumerate(dataloader):
         x_batch = x_batch.to(device)
         x_batch_recon, h, latent_mu, latent_logvar = model(x_batch)
         # vae loss
@@ -311,43 +206,14 @@ def train_VAE(model, dataloader, optimizer, scheduler, device, variational_beta,
     return model, total_loss/len(dataloader.dataset)
 
 
-def train_DAE(model, dataloader, dataloader_dirty, cond_DAE_loss, optimizer, scheduler, device, beta=None):
+def train_SAEIBS(model, dataloader, optimizer, scheduler, device, loss_opt=None):
     # set to training mode
     model.train()
     total_loss = 0
-    for b, ((x_batch,_), (x_batch_dirty,_)) in enumerate(zip(dataloader, dataloader_dirty)):
+    for b, (x_batch) in enumerate(dataloader):
         x_batch = x_batch.to(device)
-        x_batch_dirty = x_batch_dirty.to(device)
         # reconstruction
-        x_batch_recon_dirty, latent_dirty = model(x_batch_dirty)
-        # reconstruction error
-        if cond_DAE_loss == '+ project loss':
-            x_batch_recon, latent = model(x_batch)
-            loss = recon_loss(x_batch_recon_dirty, x_batch) + beta * recon_loss(latent_dirty, latent)
-        else:
-            loss = recon_loss(x_batch_recon_dirty, x_batch)
-        # backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        # one step of the optmizer (using the gradients from backpropagation)
-        optimizer.step()
-        scheduler.step()
-        # loss
-        total_loss += loss.item()
-    return model, total_loss/len(dataloader.dataset)
-
-
-def train_SAEIBS(model, dataloader, optimizer, scheduler, device, ibs=None, loss_opt=None):
-    # set to training mode
-    model.train()
-    total_loss = 0
-    for b, (x_batch, ind) in enumerate(dataloader):
-        x_batch = x_batch.to(device)
-        if ibs is not None:
-            ibs_batch = ibs[ind, ind]
-            ibs_batch = torch.diag(torch.from_numpy(ibs_batch).to(device))
-        # reconstruction
-        x_batch_recon, _, V, mean_emb = model(x_batch, ibs_batch, ind)
+        x_batch_recon, z = model(x_batch)
         # reconstruction error
         loss = recon_loss(x_batch_recon, x_batch, loss_opt)
         # backpropagation
@@ -358,38 +224,7 @@ def train_SAEIBS(model, dataloader, optimizer, scheduler, device, ibs=None, loss
         scheduler.step()
         # loss
         total_loss += loss.item()
-    return model, total_loss/len(dataloader.dataset), V, mean_emb
-
-
-def train_DSAEIBS(model, dataloader,  dataloader_dirty, cond_DAE_loss, optimizer, scheduler, device, ibs=None, ibs_dirty=None, beta=None):
-    # set to training mode
-    model.train()
-    total_loss = 0
-    for b, ((x_batch,ind), (x_batch_dirty,ind_dirty)) in enumerate(zip(dataloader, dataloader_dirty)):
-        x_batch = x_batch.to(device)
-        x_batch_dirty = x_batch_dirty.to(device)
-        if ibs is not None and ibs_dirty is not None:
-            ibs_batch = ibs[ind, ind]
-            ibs_batch = torch.diag(torch.from_numpy(ibs_batch).to(device))
-            ibs_dirty_batch = ibs_dirty[ind_dirty, ind_dirty]
-            ibs_dirty_batch = torch.diag(torch.from_numpy(ibs_dirty_batch).to(device))
-        # reconstruction
-        x_batch_recon_dirty, latent_dirty, V, mean_emb = model(x_batch_dirty, ibs_dirty_batch, ind_dirty)
-        # reconstruction error
-        if cond_DAE_loss == '+ project loss':
-            x_batch_recon, latent, _, _ = model(x_batch, ibs_batch, ind)
-            loss = recon_loss(x_batch_recon_dirty, x_batch) + beta * recon_loss(latent_dirty, latent)
-        else:
-            loss = recon_loss(x_batch_recon_dirty, x_batch)
-        # backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        # one step of the optmizer (using the gradients from backpropagation)
-        optimizer.step()
-        scheduler.step()
-        # loss
-        total_loss += loss.item()
-    return model, total_loss/len(dataloader.dataset), V, mean_emb
+    return model, total_loss/len(dataloader.dataset), z
 
 
 def validate_AE(model, data_loader, device, loss_opt=None):
@@ -408,7 +243,7 @@ def validate_VAE(model, dataloader, device, variational_beta, loss_opt=None):
     model.eval()
     total_loss = 0
     with torch.no_grad():
-        for b, (x_batch, ind) in enumerate(dataloader):
+        for b, (x_batch) in enumerate(dataloader):
             x_batch = x_batch.to(device)
             x_batch_recon, h, latent_mu, latent_logvar = model(x_batch)
             loss = vae_loss(x_batch_recon, x_batch, latent_mu, latent_logvar, variational_beta, loss_opt)
@@ -416,83 +251,37 @@ def validate_VAE(model, dataloader, device, variational_beta, loss_opt=None):
     return total_loss/len(dataloader.dataset)
 
 
-def validate_DAE(model, dataloader, dataloader_dirty, cond_DAE_loss, device, beta=None):
+def validate_SAEIBS(model, dataloader, device, loss_opt=None):
     model.eval()
     total_loss = 0
     with torch.no_grad():
-        for b, ((x_batch, _), (x_batch_dirty, _)) in enumerate(zip(dataloader, dataloader_dirty)):
+        for b, (x_batch) in enumerate(dataloader):
             x_batch = x_batch.to(device)
-            x_batch_dirty = x_batch_dirty.to(device)
-            # reconstruction
-            x_batch_recon_dirty, latent_dirty = model(x_batch_dirty)
-            # reconstruction error
-            if cond_DAE_loss == 'project_loss':
-                x_batch_recon, latent = model(x_batch)
-                loss = recon_loss(x_batch_recon_dirty, x_batch) + beta * recon_loss(latent_dirty, latent)
-            else:
-                loss = recon_loss(x_batch_recon_dirty, x_batch)
-            total_loss += loss.item()
-    return total_loss/len(dataloader.dataset)
-
-
-def validate_SAEIBS(model, dataloader, device, ibs=None, loss_opt=None):
-    model.eval()
-    total_loss = 0
-    with torch.no_grad():
-        for b, (x_batch, ind) in enumerate(dataloader):
-            x_batch = x_batch.to(device)
-            if ibs is not None:
-                ibs_batch = ibs[ind, ind]
-                ibs_batch = torch.diag(torch.from_numpy(ibs_batch).to(device))
-            x_batch_recon, _, _, _ = model(x_batch, ibs_batch, ind)
+            x_batch_recon, _ = model(x_batch)
             loss = recon_loss(x_batch_recon, x_batch, loss_opt)
             total_loss += loss.item()
     return total_loss/len(dataloader.dataset)
 
 
-def validate_DSAEIBS(model, dataloader, dataloader_dirty, cond_DAE_loss, device, ibs=None, ibs_dirty=None, beta=None):
-    model.eval()
-    total_loss = 0
-    with torch.no_grad():
-        for b, ((x_batch, ind), (x_batch_dirty, ind_dirty)) in enumerate(zip(dataloader, dataloader_dirty)):
-            x_batch = x_batch.to(device)
-            x_batch_dirty = x_batch_dirty.to(device)
-            if ibs is not None and ibs_dirty is not None:
-                ibs_batch = ibs[ind, ind]
-                ibs_batch = torch.diag(torch.from_numpy(ibs_batch).to(device))
-                ibs_dirty_batch = ibs_dirty[ind_dirty, ind_dirty]
-                ibs_dirty_batch = torch.diag(torch.from_numpy(ibs_dirty_batch).to(device))
-            # reconstruction
-            x_batch_recon_dirty, latent_dirty, _, _ = model(x_batch_dirty, ibs_dirty_batch, ind_dirty)
-            # reconstruction error
-            if cond_DAE_loss == '+ project loss':
-                x_batch_recon, latent, _, _ = model(x_batch, ibs_batch, ind)
-                loss = recon_loss(x_batch_recon_dirty, x_batch) + beta * recon_loss(latent_dirty, latent)
-            else:
-                loss = recon_loss(x_batch_recon_dirty, x_batch)
-            total_loss += loss.item()
-    return total_loss/len(dataloader.dataset)
-
-
 def project(model, data, batch_size, latent_dim, device):
-    dataloader = DataLoader(MyDataset(torch.from_numpy(data)), batch_size=batch_size, shuffle=False)
+    dataloader = DataLoader(torch.from_numpy(data), batch_size=batch_size, shuffle=False)
     # set to evaluation mode
     model.eval()
     latent = torch.zeros(0, latent_dim)
-    for b, (x_batch, _) in enumerate(dataloader):
+    for b, (x_batch) in enumerate(dataloader):
         with torch.no_grad():
             x_batch = x_batch.to(device)
             # latent space
             if 'VariationalAutoencoder' in type(model).__name__:
-                _, z, _, _ = model(x_batch)
+                X_pred, z, _, _ = model(x_batch)
             else:
-                _, z = model(x_batch)
+                X_pred, z = model(x_batch)
             latent = torch.cat((latent.to(device), z))
     latent = latent.to('cpu').detach().numpy()
-    return latent
+    return X_pred, latent
 
 
-def projectSAEIBS_traindata(model, data, ibs, V, batch_size, device):
+def projectSAEIBS_traindata(model, data, V, batch_size, device):
     dataloader = DataLoader(MyDataset(torch.from_numpy(data)), batch_size=batch_size, shuffle=False)
     # set to evaluation mode
     model.eval()
@@ -505,10 +294,37 @@ def projectSAEIBS_traindata(model, data, ibs, V, batch_size, device):
             else:
                 embedding = torch.cat([embedding, emb], 0)
 
-        embedding = torch.mm(torch.from_numpy(ibs).to(device), embedding)
         mean_emb = torch.mean(embedding, 0)
         latent = torch.matmul(embedding - mean_emb, V)
     return latent.to('cpu').detach().numpy(), mean_emb.to('cpu').detach().numpy()
+
+def projectSAEIBS_single(model, data, device):
+    dataloader = DataLoader(torch.from_numpy(data), batch_size=1, shuffle=False)
+
+    model.eval()
+    with torch.no_grad():
+        for b, (x_batch) in enumerate(dataloader):
+            x_batch = x_batch.to(device)
+            x_enc, z, x_hat, V, mean_emb = model.encoder_svd(x_batch)
+
+            print(z)
+
+            x_hat_v2 = torch.matmul(z, torch.transpose(V, 0, 1)) + mean_emb
+            
+            print(x_hat.shape)
+            print(x_hat_v2,shape)
+
+            x_recon = model.decoder(x_hat_v2)
+
+            print(x_recon.shape)
+            print(x_batch.shape)
+
+            # if b == 0:
+            #     latent = copy.deepcopy(x_enc)
+            # else:
+            #     embedding = torch.cat([embedding, emb], 0)
+
+    # return latent.to('cpu').detach().numpy(), mean_emb.to('cpu').detach().numpy()
 
 
 def projectSAEIBS_newdata(model, data, ibs_connect, V, mean_emb, batch_size, device):
@@ -552,6 +368,3 @@ def orthogonality(latent, path, run_parameters, modelname):
     plt.savefig(path + '/Cov_' + run_parameters + '.jpg')
     plt.show()
     return cov_emb
-
-
-
