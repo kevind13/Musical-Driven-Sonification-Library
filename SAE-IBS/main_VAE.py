@@ -89,3 +89,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#python main_VAE.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "VAE" --maxNum_epochs 100 --patience 100
