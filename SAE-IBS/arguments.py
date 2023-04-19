@@ -21,9 +21,6 @@ def parse_args():
     parser.add_argument('--ref_data_dir',
                         default=base + 'timeseries_midi_dataset_all.mat',
                         type=str, metavar='PATH', help='training data path')
-    parser.add_argument('--ref_ibs_dir',
-                        default=base + 'ibs.mat',
-                        type=str, metavar='PATH', help='training data IBS path')
 
     parser.add_argument('--pretrain_model_type', default='AE',
                         type=str, help='pretrain model type')
@@ -33,7 +30,7 @@ def parse_args():
     parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--maxNum_epochs', default=3000, type=int)
     parser.add_argument('--pretrain_epochs', default=100, type=int)
-    parser.add_argument('--patience', default=300, type=int)
+    parser.add_argument('--patience', default=50, type=int)
     parser.add_argument('--loss_opt', default='BCE', type=str)
 
     # network hyperparameters
