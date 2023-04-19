@@ -9,7 +9,7 @@ def flatten(t):
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, activation_fn=F.leaky_relu):
+    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, activation_fn=F.relu):
         super(Encoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -17,6 +17,8 @@ class Encoder(nn.Module):
         self.cond_dropout = cond_dropout
         self.drop_rate = drop_rate
         self.activation_fn = activation_fn
+
+        self.zero_mean = nn.BatchNorm1d(self.latent_dim, affine=False, eps=0) ## NOTA: AGREGAR ESTO DISMINUYÓ MUCHISIMO EL LOSS
 
         if type(input_dim) is tuple:
             self.input_dim = reduce(lambda x, y: x * y, input_dim)
@@ -33,13 +35,17 @@ class Encoder(nn.Module):
     def forward(self, x):
         batch_size = x.size(0)
         x = x.view(batch_size, -1)
-        for layer in self.hidden:
+        for layer in self.hidden[:-1]:
             x = self.activation_fn(layer(x))
+        x = self.hidden[-1](x)
+        x = x.view((batch_size, -1))
+
+        x = self.zero_mean(x)
         return x
 
 
 class Decoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, actFn, activation_fn=F.leaky_relu):
+    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, actFn, activation_fn=F.relu):
         super(Decoder, self).__init__()
         self.input_dim = input_dim
         self.output_shape = input_dim
@@ -80,6 +86,8 @@ class Decoder(nn.Module):
             x = torch.tanh(x)
         elif self.actFn == 'leakyRelu':
             x = F.leaky_relu(x)
+        elif self.actFn == 'relu':
+            x = F.relu(x)
         return x
 
 
@@ -102,7 +110,7 @@ class Autoencoder(nn.Module):
 
 
 class VAE_Encoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, activation_fn=F.leaky_relu):
+    def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, activation_fn=F.relu):
         super(VAE_Encoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -110,7 +118,12 @@ class VAE_Encoder(nn.Module):
         self.cond_dropout = cond_dropout
         self.drop_rate = drop_rate
         self.activation_fn = activation_fn
-        neurons = [input_dim, *hidden_dim]
+
+        if type(input_dim) is tuple:
+            self.input_dim = reduce(lambda x, y: x * y, input_dim)
+
+        neurons = [self.input_dim, *hidden_dim]
+
         if cond_dropout:
             layers = flatten(
                 [[nn.Linear(neurons[i - 1], neurons[i]), nn.Dropout(p=drop_rate)] for i in range(1, len(neurons))])
@@ -122,10 +135,14 @@ class VAE_Encoder(nn.Module):
         self.fc_logvar = nn.Linear(in_features=hidden_dim[-1], out_features=latent_dim)
 
     def forward(self, x):
+        batch_size = x.size(0)
+        x = x.view(batch_size, -1)
         for layer in self.hidden:
             x = self.activation_fn(layer(x))
         x_mu = self.fc_mu(x)
+        x_mu = x_mu.view((batch_size, -1))
         x_logvar = self.fc_logvar(x)
+        x_logvar = x_logvar.view((batch_size, -1))
         return x_mu, x_logvar
 
 
@@ -180,32 +197,22 @@ class SAEIBS(nn.Module):
         self.emb = x
         self.mean_emb = nn.Parameter(torch.mean(self.emb, 0))
         _, _, V = torch.svd_lowrank(self.emb - self.mean_emb, self.rank)
-        print(V)
         max_ind = torch.argmax(torch.abs(V), 0)
         colsign = torch.sign(V[max_ind, torch.arange(V.shape[1])])
         self.V = nn.Parameter(V * colsign)
 
-    def update_svd(self, x, ibs_batch, indices=None):
-        with torch.no_grad():
-            self.emb[indices.squeeze(), :] = torch.mm(ibs_batch, x)
-            self.mean_emb = nn.Parameter(torch.mean(self.emb, 0))
-        _, _, V = torch.svd_lowrank(self.emb - self.mean_emb, self.rank)
-        max_ind = torch.argmax(torch.abs(V), 0)
-        colsign = torch.sign(V[max_ind, torch.arange(V.shape[1])])
-        self.V = nn.Parameter(V * colsign)
-        z = torch.matmul(self.emb - self.mean_emb, self.V)
+    def update_svd(self, x):
+        z = torch.matmul(x - self.mean_emb, self.V)
         x_hat = torch.matmul(z, torch.transpose(self.V, 0, 1)) + self.mean_emb
-        return z, x_hat, self.V, self.mean_emb
+        return z, x_hat
 
-    def encoder_svd(self, x, ibs_batch, indices=None):
+    def encoder_svd(self, x):
         x_enc = self.encoder(x)
-        z, x_hat, self.V, self.mean_emb = self.update_svd(x_enc, ibs_batch, indices)
-        return x_enc, z, x_hat, self.V, self.mean_emb
+        z, x_hat = self.update_svd(x_enc)
+        return x_enc, z, x_hat
 
-    def forward(self, x, ibs_batch, indices=None):
-        x_enc, z, x_hat, self.V, self.mean_emb = self.encoder_svd(x, ibs_batch, indices)
-        x_back = torch.mm(torch.inverse(ibs_batch), x_hat[indices.squeeze(), :])
-        x_recon = self.decoder(x_back)
-        return x_recon, z, self.V, self.mean_emb
-
+    def forward(self, x):
+        x_enc, z, x_hat = self.encoder_svd(x)
+        x_recon = self.decoder(x_hat)
+        return x_recon, z
 
