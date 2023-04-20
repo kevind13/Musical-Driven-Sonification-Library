@@ -174,10 +174,9 @@ class VariationalAutoencoder(nn.Module):
             return mu
 
 
-
-class SAEIBS(nn.Module):
+class SAE(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim, cond_dropout, drop_rate, actFn):
-        super(SAEIBS, self).__init__()
+        super(SAE, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
@@ -210,9 +209,13 @@ class SAEIBS(nn.Module):
         x_enc = self.encoder(x)
         z, x_hat = self.update_svd(x_enc)
         return x_enc, z, x_hat
+    
+    def decoder_svd(self, z):
+        x_hat = torch.matmul(z, torch.transpose(self.V, 0, 1)) + self.mean_emb
+        x_recon = self.decoder(x_hat)
+        return x_recon
 
     def forward(self, x):
         x_enc, z, x_hat = self.encoder_svd(x)
         x_recon = self.decoder(x_hat)
         return x_recon, z
-
