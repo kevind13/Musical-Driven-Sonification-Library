@@ -53,7 +53,8 @@ def main():
 
     model = VariationalAutoencoder(input_dim, args.hidden_dim, args.latent_dim, args.cond_dropout, args.drop_rate, args.actFn)
 
-    model.apply(init_weights)
+    if args.init_weights:
+        model.apply(init_weights)
 
     model = model.to(device)
 

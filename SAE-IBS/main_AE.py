@@ -53,7 +53,8 @@ def main():
 
     model = Autoencoder(input_dim, args.hidden_dim, args.latent_dim, args.cond_dropout, args.drop_rate, args.actFn)
 
-    model.apply(init_weights)
+    if args.init_weights:
+        model.apply(init_weights)
 
     model = model.to(device)
 
@@ -90,3 +91,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#python main_AE.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "AE" --maxNum_epochs 100 --patience 100
