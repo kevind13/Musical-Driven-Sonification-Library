@@ -46,14 +46,14 @@ def vae_loss(recon_x, x, mu, logvar, variational_beta, loss_opt=None):
     return rcon_loss + variational_beta * kldivergence
 
 
-def save_checkpoint(model, optimizer, scheduler, epoch, path, V=None):
+def save_checkpoint(model, optimizer, scheduler, epoch, path, V=None, fname=None):
     if V is None:
         torch.save(
             {'model': model,
              'model_state_dict': model.state_dict(),
              'optimizer_state_dict': optimizer.state_dict(),
              'scheduler_state_dict': scheduler.state_dict()},
-            os.path.join(path,'checkpoint_{:04d}.pt'.format(epoch)))
+            os.path.join(path,fname or 'checkpoint_{:04d}.pt'.format(epoch)))
     else:
         torch.save(
             {'model': model,
@@ -61,7 +61,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch, path, V=None):
              'V': V,
              'optimizer_state_dict': optimizer.state_dict(),
              'scheduler_state_dict': scheduler.state_dict()},
-            os.path.join(path,'checkpoint_SAEIBS_{:04d}.pt'.format(epoch)))
+            os.path.join(path,fname or 'checkpoint_SAE_{:04d}.pt'.format(epoch)))
 
 
 def run_AE(model, train_data, val_data, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, loss_opt=None):    
@@ -72,7 +72,7 @@ def run_AE(model, train_data, val_data, batch_size, optimizer, scheduler, device
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/best_checkpoint_AE.pt', patience=num_patience, verbose=True, delta=0.00001)
+    early_stopping = EarlyStopping(path=savepath + '/best_checkpoint_AE.pt', patience=num_patience, verbose=True, delta=0.0001)
 
     for epoch in range(num_epochs):
         model, train_loss = train_AE(model, train_loader, optimizer, scheduler, device, loss_opt)
@@ -86,6 +86,9 @@ def run_AE(model, train_data, val_data, batch_size, optimizer, scheduler, device
         if early_stopping.early_stop:
             print('Early stopping at epoch: %d' % epoch)
             break
+    
+    early_stopping.save_checkpoint(None, model, None, None, force=True) ## This is if I want to save always the last model. Normaly it will save if the earlystopping wants
+
     checkpoint = torch.load(savepath + '/best_checkpoint_AE.pt')  # reload the best checkpoint
     model.load_state_dict(checkpoint['model_state_dict'])
     val_loss_min = early_stopping.val_loss_min
@@ -97,11 +100,11 @@ def run_VAE(model, train_data, val_data, batch_size, optimizer, scheduler, devic
     train_loader = DataLoader(torch.from_numpy(train_data), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(torch.from_numpy(val_data), batch_size=batch_size, shuffle=True)
 
-    print('Training AE...')
+    print('Training VAE...')
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.00001)
+    early_stopping = EarlyStopping(path=savepath + '/checkpoint.pt', patience=num_patience, verbose=True, delta=0.0001)
 
     for epoch in range(num_epochs):
         model, train_loss = train_VAE(model, train_loader, optimizer, scheduler, device,variational_beta, loss_opt)
@@ -113,18 +116,20 @@ def run_VAE(model, train_data, val_data, batch_size, optimizer, scheduler, devic
         if early_stopping.early_stop:
             print("Early stopping")
             break
+    
+    early_stopping.save_checkpoint(None, model, None, None, force=True) ## This is if I want to save always the last model. Normaly it will save if the earlystopping wants
     checkpoint = torch.load(savepath + '/checkpoint.pt')  # reload the best checkpoint
-    model.load_state_dict(checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
     val_loss_min = early_stopping.val_loss_min
     return model, train_losses, val_losses, val_loss_min
 
 
-def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, ref_ibs=None, loss_opt=None):
+def run_SAE(model, train_data, val_data, batch_size, optimizer, scheduler, device, num_epochs, savepath, num_patience, ref_ibs=None, loss_opt=None):
 
     train_loader = DataLoader(torch.from_numpy(train_data), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(torch.from_numpy(val_data), batch_size=batch_size, shuffle=True)
 
-    print('Training SAEIBS...')
+    print('Training SAE...')
 
     if 'SAE' in type(model).__name__:
         if model.emb is None:
@@ -142,11 +147,11 @@ def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, de
     train_losses = []
     val_losses = []
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(path=savepath + '/bestcheckpoint_SAEIBS.pt', patience=num_patience, verbose=True, delta=0.00001)
+    early_stopping = EarlyStopping(path=savepath + '/bestcheckpoint_SAE.pt', patience=num_patience, verbose=True, delta=0.0001)
 
     for epoch in range(num_epochs):
-        model, train_loss, z = train_SAEIBS(model, train_loader, optimizer, scheduler, device, loss_opt)
-        val_loss = validate_SAEIBS(model, val_loader, device, loss_opt)
+        model, train_loss, z = train_SAE(model, train_loader, optimizer, scheduler, device, loss_opt)
+        val_loss = validate_SAE(model, val_loader, device, loss_opt)
         print('Epoch [%d / %d] training loss: %f validation loss: %f' % (epoch + 1, num_epochs, train_loss, val_loss))
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -157,7 +162,9 @@ def run_SAEIBS(model, train_data, val_data, batch_size, optimizer, scheduler, de
         if early_stopping.early_stop:
             print("Early stopping")
             break
-    checkpoint = torch.load(savepath + '/bestcheckpoint_SAEIBS.pt')  # reload best checkpoint
+
+    early_stopping.save_checkpoint(None, model, None, None, force=True) ## This is if I want to save always the last model. Normaly it will save if the earlystopping wants
+    checkpoint = torch.load(savepath + '/bestcheckpoint_SAE.pt')  # reload best checkpoint
     model.load_state_dict(checkpoint['model_state_dict'])
     V = checkpoint['V']
     val_loss_min = early_stopping.val_loss_min
@@ -206,7 +213,7 @@ def train_VAE(model, dataloader, optimizer, scheduler, device, variational_beta,
     return model, total_loss/len(dataloader.dataset)
 
 
-def train_SAEIBS(model, dataloader, optimizer, scheduler, device, loss_opt=None):
+def train_SAE(model, dataloader, optimizer, scheduler, device, loss_opt=None):
     # set to training mode
     model.train()
     total_loss = 0
@@ -251,7 +258,7 @@ def validate_VAE(model, dataloader, device, variational_beta, loss_opt=None):
     return total_loss/len(dataloader.dataset)
 
 
-def validate_SAEIBS(model, dataloader, device, loss_opt=None):
+def validate_SAE(model, dataloader, device, loss_opt=None):
     model.eval()
     total_loss = 0
     with torch.no_grad():
@@ -281,24 +288,20 @@ def project(model, data, batch_size, latent_dim, device):
     return X_pred, latent
 
 
-def projectSAEIBS_traindata(model, data, V, batch_size, device):
-    dataloader = DataLoader(MyDataset(torch.from_numpy(data)), batch_size=batch_size, shuffle=False)
+def projectSAE(model, data, batch_size, latent_dim, device):
+    dataloader = DataLoader(torch.from_numpy(data), batch_size=batch_size, shuffle=False)
     # set to evaluation mode
     model.eval()
-    with torch.no_grad():
-        for b, (x_batch, _) in enumerate(dataloader):
+    latent = torch.zeros(0, latent_dim)
+    for b, (x_batch) in enumerate(dataloader):
+        with torch.no_grad():
             x_batch = x_batch.to(device)
-            emb = model.encoder(x_batch)
-            if b == 0:
-                embedding = copy.deepcopy(emb)
-            else:
-                embedding = torch.cat([embedding, emb], 0)
+            X_pred, z = model(x_batch)
+            latent = torch.cat((latent.to(device), z))
+    latent = latent.to('cpu').detach().numpy()
+    return X_pred, latent
 
-        mean_emb = torch.mean(embedding, 0)
-        latent = torch.matmul(embedding - mean_emb, V)
-    return latent.to('cpu').detach().numpy(), mean_emb.to('cpu').detach().numpy()
-
-def projectSAEIBS_single(model, data, device):
+def projectSAE_single(model, data, device):
     dataloader = DataLoader(torch.from_numpy(data), batch_size=1, shuffle=False)
 
     model.eval()
@@ -327,7 +330,7 @@ def projectSAEIBS_single(model, data, device):
     # return latent.to('cpu').detach().numpy(), mean_emb.to('cpu').detach().numpy()
 
 
-def projectSAEIBS_newdata(model, data, ibs_connect, V, mean_emb, batch_size, device):
+def projectSAE_newdata(model, data, ibs_connect, V, mean_emb, batch_size, device):
     dataloader = DataLoader(MyDataset(torch.from_numpy(data)), batch_size=batch_size, shuffle=False)
     # set to evaluation mode
     model.eval()
@@ -351,10 +354,10 @@ def load_project_save(dir, fname, model, savename, key, savepath, batch_size, sc
     savemat(savepath + '/' + savename + '.mat', mdict={key: latent})
 
 
-def load_projectSAEIBS_save(dir, fname, dir_ibs, fname_ibs, model, V, mean_emb, savename, key, savepath, batch_size, scale_opt, device):
+def load_projectSAE_save(dir, fname, dir_ibs, fname_ibs, model, V, mean_emb, savename, key, savepath, batch_size, scale_opt, device):
     data = load_data(dir, fname, scale_opt)
     ibs_connect = load_ibs(dir_ibs, fname_ibs)
-    latent = projectSAEIBS_newdata(model, data, ibs_connect, V, mean_emb, batch_size, device)
+    latent = projectSAE_newdata(model, data, ibs_connect, V, mean_emb, batch_size, device)
     savemat(savepath + '/' + savename + '.mat', mdict={key: latent})
 
 
@@ -364,7 +367,7 @@ def orthogonality(latent, path, run_parameters, modelname):
     plt.imshow(cov_emb, cmap='seismic', interpolation='nearest')
     plt.xlabel("Dimension")
     plt.ylabel("Dimension")
-    plt.suptitle("Covariance matrix\n (1 KG " + modelname + run_parameters + ")", fontsize=12)
+    plt.suptitle("Covariance matrix\n ( " + modelname + run_parameters + ")", fontsize=12)
     plt.savefig(path + '/Cov_' + run_parameters + '.jpg')
     plt.show()
     return cov_emb
