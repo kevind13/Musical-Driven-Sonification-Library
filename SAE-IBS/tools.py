@@ -47,13 +47,16 @@ class EarlyStopping:
                 self.save_checkpoint(val_loss, model, V, mean_emb)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model, V, mean_emb):
+    def save_checkpoint(self, val_loss, model, V, mean_emb, force=False):
         '''Saves model when validation loss decrease.'''
-        if self.verbose:
+        if self.verbose and not force:
             self.trace_func(
                 f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        if self.verbose and force:
+            self.trace_func(
+                f'Force to save.  Saving model ...')
         if 'SAE' in type(model).__name__:
-            print('SAEIBS-checkpoint')
+            print('SAE-checkpoint')
             checkpoint = {'model': model,
                           'model_state_dict': model.state_dict(),
                           'V': V, 'mean_emb': mean_emb}
