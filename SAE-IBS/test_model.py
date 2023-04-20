@@ -51,11 +51,11 @@ def main():
     pred_data = project_mat['pred_data']
 
     testing_dataset = DataLoader(torch.from_numpy(test_data),batch_size=1,shuffle=False)
-    for x in testing_dataset:
+
+    for index, (x) in enumerate(testing_dataset):
         data = x.to(device)
-        print(data.size())
         if 'VariationalAutoencoder' in type(model).__name__:
-                X_pred, z, _, _ = model(data)
+            X_pred, z, _, _ = model(data)
         else:
             X_pred, z = model(data)
         X_pred = X_pred.to('cpu').detach().numpy()
@@ -63,13 +63,26 @@ def main():
 
         X_test = data.to('cpu').detach().numpy()
         X_test = np.argmax(X_test.reshape((-1, X_test.shape[-1])), axis=-1).reshape((X_test.shape[1],X_test.shape[2]))
-        
-        print(z.to('cpu').detach().numpy()[0][:10])
 
-        print(X_test[:10])
-        print(X_pred[:10])
+        print(X_test[:3])
+        print(X_pred[:3])
 
-        break
+        print('Now from the lastent space that is saved from the training')
+
+        latent_test = torch.from_numpy(np.array([latent_project[index]])).to(device)
+
+        if 'SAE' in type(model).__name__:
+            X_recon = model.decoder_svd(latent_test)
+        else:
+            X_recon = model.decoder(latent_test)
+
+        X_recon = X_recon.to('cpu').detach().numpy()
+        X_recon = np.argmax(X_recon.reshape((-1, X_recon.shape[-1])), axis=-1).reshape((X_recon.shape[1],X_recon.shape[2]))
+
+        print(X_recon[:3])
+
+        if index == 3:
+            break
 
 if __name__ == '__main__':
     main()
