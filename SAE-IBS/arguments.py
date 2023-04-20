@@ -35,7 +35,7 @@ def parse_args():
 
     # network hyperparameters
     parser.add_argument('--latent_dim', default=130, type=int)
-    parser.add_argument('--hidden_dim', default=[512*20, 512*5, 512], type=int)
+    parser.add_argument('--hidden_dim', default=[512*18, 512*5, 512], type=int)
     parser.add_argument('--drop_rate', default=0.1, type=int)
     parser.add_argument('--cond_dropout', default=False, type=bool, help='add dropout layer')
 
@@ -45,6 +45,9 @@ def parse_args():
     parser.add_argument('--lr_decay', default=0.9999, type=float)
     parser.add_argument('--decay_step', default=1, type=int)
     parser.add_argument('--weight_decay', default=1e-6, type=float)
+
+    # model weigths
+    parser.add_argument('--init_weights', default=False, type=bool)
 
     args = parser.parse_args()
     return args
