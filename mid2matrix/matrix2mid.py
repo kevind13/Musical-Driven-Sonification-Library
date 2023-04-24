@@ -16,6 +16,7 @@ def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 12
         
         track.append(mido.MetaMessage('time_signature', numerator=4, denominator=4, clocks_per_click=24, notated_32nd_notes_per_beat=8, time=0))
 
+        channels = [1,2,3,4]
         count = 0
         zeros = 0
         previous_val = None
@@ -29,15 +30,15 @@ def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 12
             else:
                 ## Entra cuando cambia de valor en algún momento y tengo dos opciones 
                 if previous_val is not None:
-                    track.append(mido.Message('note_on', note=previous_val, velocity=velocity, time=zeros*block_size))
-                    track.append(mido.Message('note_off', note=previous_val, velocity=0, time=count*block_size))
+                    track.append(mido.Message('note_on', note=previous_val, velocity=velocity, time=zeros*block_size, channel=channels[track_number]))
+                    track.append(mido.Message('note_off', note=previous_val, velocity=0, time=count*block_size, channel=channels[track_number]))
                 previous_val = new_ary[i]
                 count = 1
                 zeros = 0
 
         if previous_val is not None:
-            track.append(mido.Message('note_on', note=previous_val, velocity=velocity, time=zeros*block_size))
-            track.append(mido.Message('note_off', note=previous_val, velocity=0, time=count*block_size))
+            track.append(mido.Message('note_on', note=previous_val, velocity=velocity, time=zeros*block_size, channel=channels[track_number]))
+            track.append(mido.Message('note_off', note=previous_val, velocity=0, time=count*block_size, channel=channels[track_number]))
 
         mid_new.tracks.append(track)
 

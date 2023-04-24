@@ -18,17 +18,19 @@ Implementation of master's thesis
     [x] go back bits
     [x] plot to compare midi plots
     
-
-    [] loss of valid with 01
-    [] hyperparameters
-    [x] fix array 2 midi function
-    [] MSE
-
-
-    
 ## Time
 
     PCAAE 100rows -> 31 minutes 21.22 seconds
     PCAEE 3000+ -> 20 hours 0 minutes 26 seconds
     PCAAE 01 500 rows -> 5 hours
 
+## Questions
+    The different tempo should make difference?
+
+
+
+ 
+    [] db integration
+    [] z score
+    [] channels
+    [] different data
