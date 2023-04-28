@@ -298,6 +298,8 @@ def projectSAE(model, data, batch_size, latent_dim, device):
             x_batch = x_batch.to(device)
             X_pred, z = model(x_batch)
             latent = torch.cat((latent.to(device), z))
+
+        print(f'{b} / {len(dataloader)}')
     latent = latent.to('cpu').detach().numpy()
     return X_pred, latent
 
@@ -315,7 +317,7 @@ def projectSAE_single(model, data, device):
             x_hat_v2 = torch.matmul(z, torch.transpose(V, 0, 1)) + mean_emb
             
             print(x_hat.shape)
-            print(x_hat_v2,shape)
+            print(x_hat_v2.shape)
 
             x_recon = model.decoder(x_hat_v2)
 
