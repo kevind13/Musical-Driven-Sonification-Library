@@ -26,15 +26,18 @@ import scipy.io as sio
 
 
 dir_name = ''
-sub_dir_name = 'results/SAE/SAE_3_Layer_140_Latent_9216_2560_512/SAE_3_Layer_140_Latent_9216_2560_512.tar'
-latent_path = 'results/SAE/SAE_3_Layer_140_Latent_9216_2560_512/latent/latent_project.mat'
+model_name = 'SAE'
+latent_space_model_number = 7
+sub_dir_name = f'results/{model_name}/{model_name}_3_Layer_{latent_space_model_number}_Latent_9216_2560_512/{model_name}_3_Layer_{latent_space_model_number}_Latent_9216_2560_512.tar'
+latent_path = f'results/{model_name}/{model_name}_3_Layer_{latent_space_model_number}_Latent_9216_2560_512/latent/latent_project.mat'
+complete_latent_path = f'results/{model_name}/{model_name}_3_Layer_{latent_space_model_number}_Latent_9216_2560_512/latent/all_latent_project.mat'
+
 sample_rate = 44100
 buffer_size = 64
 buffer_sec = (buffer_size / sample_rate)
 note_dt = 2000
 note_duration = 20000
 note_decay = 5.0 / sample_rate
-num_params = 140 # DIMENSIONS
 num_measures = 16
 num_sigmas = 5.0
 note_threshold = 32
@@ -48,8 +51,6 @@ slider_colors = [(90, 20, 20), (90, 90, 20), (20, 90, 20), (20, 90, 90), (20, 20
 note_w = 4
 note_h = 128
 
-slider_num = min(10, num_params)
-
 control_num = 2
 control_inits = [0.75, 0.5, 0.5]
 control_colors = [(255, 128, 0), (0, 0, 255)]
@@ -59,7 +60,7 @@ window_height = 600
 margin = 20
 sliders_width = int(window_width * (2.0/4.0))
 sliders_height = int(window_height * (2.5/3.0))
-slider_width = int((sliders_width-margin*2) / 5.0)
+slider_width = int((sliders_width-margin*2) / 4.0)
 slider_height = sliders_height-margin*2
 
 controls_width = int(window_width * (2.0/4.0))
@@ -78,9 +79,16 @@ filename = '../assets/button.png'
 button_png = pygame.image.load(filename)
 
 project_mat = sio.loadmat(latent_path)
+all_project_mat = sio.loadmat(complete_latent_path)
 
 principal_components = project_mat['latent_project']
+all_principal_components = all_project_mat['latent_project']
+all_principal_components = np.transpose(all_principal_components, (1,0))
+
 X_samples = project_mat['test_data']
+
+num_params = principal_components.shape[1] # DIMENSIONS
+slider_num = min(10, num_params)
 
 pcs_distributions = []
 interpolators = []
@@ -93,6 +101,14 @@ for x in range(principal_components.shape[1]):
     f_inv = interp1d([np.min(principal_components[:,x]), np.mean(principal_components[:,x]), np.max(principal_components[:,x])], [-5, 0, 5], assume_sorted=True, kind='linear', bounds_error=False) #when mapping from component to slider
     interpolators.append((f,f_inv))
 
+all_principal_components_statistics = []
+z_scores_components = []
+for x in all_principal_components:
+    z_scores = (x-np.mean(x))/np.std(x)
+    z_scores_components.append(z_scores)
+    all_principal_components_statistics.append({'x_min' : np.min(x), 'x_max': np.max(x), 'x_mean': np.mean(x), 'x_std': np.std(x), 'z_min' : np.min(z_scores), 'z_max' : np.max(z_scores), 'z_mean' : np.mean(z_scores), 'z_std': np.std(z_scores)})
+   
+print(all_principal_components_statistics)
 
 prev_mouse_pos = None
 mouse_pressed = 0
@@ -145,7 +161,6 @@ def play_midi():
         while idx<len(current_midi_events) and _play:
             msg= current_midi_events[idx]
             idx+=1
-            # print(msg)
             input_time +=msg.time
             playback_time = time.time() - start_time
             duration_to_next_event = input_time - playback_time            
@@ -203,7 +218,8 @@ def update_mouse_move(mouse_pos):
     if mouse_pressed == 1:
         if margin <= mouse_pos[1] <= margin+slider_height:
             val = (float(mouse_pos[1]-margin) / slider_height - 0.5) * (num_sigmas * 2)
-            mapped_range = interpolators[cur_slider_ix][0](val)
+            # mapped_range = interpolators[cur_slider_ix][0](val)
+            mapped_range = val * all_principal_components_statistics[cur_slider_ix]['x_std'] + all_principal_components_statistics[cur_slider_ix]['x_mean'] 
             current_params[0][int(cur_slider_ix)] = mapped_range
             needs_update = True
             audio_reset = True
@@ -215,7 +231,7 @@ def draw_sliders(screen):
     for i in range(slider_num):
         slider_color = (100, 100, 100)
         slider_color_layer = (195, 195, 195)
-        x = margin + i * slider_width
+        x = margin + i * slider_width + 30
         y = margin*2
 
         cx = x + slider_width / 2
@@ -234,7 +250,11 @@ def draw_sliders(screen):
             col = (0, 0, 0) if j - num_sigmas == 0 else slider_color
             pygame.draw.line(screen, col, (cx_1, ly), (cx_2, ly), 1)
 
-        py = y + int((interpolators[i][1](current_params[0][i]) / (num_sigmas * 2) + 0.5) * slider_height) - 25
+
+        # val = interpolators[i][1](current_params[0][i])
+        val = (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
+
+        py = y + int((val / (num_sigmas * 2) + 0.5) * slider_height) - 25
         screen.blit(knob, (int(cx-15), int(py)))
 
 
@@ -247,24 +267,49 @@ def draw_text(screen):
     description_font = pygame.font.SysFont(None, 25)
     label_font = pygame.font.SysFont(None, 15)
 
-    text_sliders = label_font.render('LATENT VALUES (TOP 5)', True, (0, 0, 0))
+    text_sliders = label_font.render(f'LATENT VALUES (TOP {slider_num})', True, (0, 0, 0))
     screen.blit(text_sliders, (margin*2.5, margin-5))
 
 
+
+    x = margin - 5
+    y = margin*2
+    cx_2 = x + slider_width - 30
+
+    y1 = y + slider_height / 2.0 + (10 - num_sigmas) * slider_height / (num_sigmas * 2.0)
+    y1 = int(y1)
+    for index, value in enumerate(["x_curr", "z_curr", "x_min", "x_max", "x_std", "z_min", "z_max"]):
+            temp_text = label_font.render(value, True, (0, 0, 0))
+            text_height = (temp_text.get_rect().height) / 2.0
+            screen.blit(temp_text, (cx_2-52, y1 + (20 + index * 10)))
+
     for i in range(slider_num):
-        x = margin + i * slider_width
+        x = margin + i * slider_width + 30
         y = margin*2
         cx_2 = x + slider_width - 8
 
         y1 = y + slider_height / 2.0 + (10 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y1 = int(y1)
-        text_slider_value_5 = label_font.render(f'{pcs_distributions[i][1]:.3f}', True, (0, 0, 0))
+        text_slider_value_5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * 5:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_5.get_rect().height) / 2.0
         screen.blit(text_slider_value_5, (cx_2, y1-text_height))
 
+        ## Current parameter
         current_param = label_font.render(f'{current_params[0][i]:.7f}', True, (0, 0, 0))
         text_height = (current_param.get_rect().height) / 2.0
+        screen.blit(current_param, (cx_2-52, y1 + 20))
+
+        ## Current parameter in z-score
+        val = (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
+        current_param = label_font.render(f'{val:.7f}', True, (0, 0, 0))
+        text_height = (current_param.get_rect().height) / 2.0
         screen.blit(current_param, (cx_2-52, y1 + 30))
+
+        ## Extra parameters
+        for index, value in enumerate(["x_min", "x_max", "x_std", "z_min", "z_max"]):
+            temp_text = label_font.render(f'{all_principal_components_statistics[i][value]:.7f}', True, (0, 0, 0))
+            text_height = (temp_text.get_rect().height) / 2.0
+            screen.blit(temp_text, (cx_2-52, y1 + (40 + index * 10)))
 
         y1 = y + slider_height / 2.0 + (5 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y1 = int(y1)
@@ -274,7 +319,7 @@ def draw_text(screen):
 
         y2 = y + slider_height / 2.0 + (0 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y2 = int(y2)
-        text_slider_value_m5 = label_font.render(f'{pcs_distributions[i][0]:.3f}', True, (0, 0, 0))
+        text_slider_value_m5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * -5:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_m5.get_rect().height) / 2.0
         screen.blit(text_slider_value_m5, (cx_2, y2-text_height))
 
@@ -377,9 +422,13 @@ def play():
                         current_params = [principal_components[int(random_song_ix)]]
                         random_song_ix = (random_song_ix + 1) % max_random_songs
 
-                        # current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values  # REVISAR ESTO
                         needs_update = True
                         audio_reset = True
+                if event.key == pygame.K_r:
+                    needs_update = True
+                    current_params = np.copy(current_params_statics)
+
+
 
         if next_song: 
             print("Random Song Index: " + str(random_song_ix))
@@ -391,7 +440,6 @@ def play():
             next_song = False
 
         if needs_update:
-            # latent_x = latent_means + np.dot(current_params * latent_pca_values, latent_pca_vectors) # REVISAR ESTO
             current_params_statics = np.copy(current_params)
 
             latent_current = torch.from_numpy(np.array(current_params))
@@ -417,7 +465,7 @@ def play():
             if audio_reset:
                 current_file_index = 0
                 audio_reset = False
-            current_file_index = 0
+            # current_file_index = 0
             needs_update = False
 
         screen.fill(background_color)
@@ -436,10 +484,10 @@ def play():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='CHANGE NAME')
-    parser.add_argument('--model_path', type=str, required=True)
-    parser.add_argument('--latent_path', type=str, required=True)
+    # parser.add_argument('--model_path', type=str, required=True)
+    # parser.add_argument('--latent_path', type=str, required=True)
     args = parser.parse_args()
-    sub_dir_name = args.model_path
-    latent_path = args.latent_path
+    # sub_dir_name = args.model_path
+    # latent_path = args.latent_path
 
     play()
