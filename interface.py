@@ -128,12 +128,10 @@ def play_midi():
         start_time = time.time()
         input_time = 0.0 
         idx=0
-        # print(" hola")
 
         while idx<len(current_midi_events) and _play:
             msg= current_midi_events[idx]
             idx+=1
-            # print(msg)
             input_time +=msg.time
             playback_time = time.time() - start_time
             duration_to_next_event = input_time - playback_time            
@@ -400,7 +398,6 @@ def play():
 
             current_midi_events = [msg for msg in current_midi_events]
             current_midi_size = len(current_midi_events)
-            # print(current_params)
             if audio_reset:
                 current_file_index = 0
                 audio_reset = False
