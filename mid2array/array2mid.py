@@ -34,10 +34,7 @@ def array2mid(ary, tempo=None, truncate_range: Optional[tuple[int, int]] = None,
         time_tuple=(None,0)
 
         for ch in new_ary:
-            
-            # print('where: ', np.where(ch > 0))
             on_notes = np.where(ch > 0)[0]
-            # print('on_notes: ',on_notes)
             on_notes_vol = ch[on_notes]
 
             if len(on_notes) > 1:
