@@ -37,12 +37,13 @@ def plot_midi_array(array,
 
 def compare_midi_arrays(real,
                         reconstructed,
+                        title = None,
                         titles = None,
                         x_label: Optional[str] = None,
                         y_label: Optional[str] = None,
                         legend: Optional[bool] = None):
 
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(12, 8))
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
 
     colors = ['b', 'g', 'orange', 'r']
     
@@ -60,7 +61,7 @@ def compare_midi_arrays(real,
             axs[index].set_title(titles[index])
         if legend:
             axs[index].legend()
-
-
+    if title is not None:
+        fig.suptitle(title)
     plt.tight_layout()
     plt.show()
