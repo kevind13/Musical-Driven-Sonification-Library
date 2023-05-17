@@ -3,6 +3,8 @@
 
 import warnings
 import sys
+
+from SAE-IBS.DB_PASS import DB_PASS
 sys.path.append('../')
 
 from mid2matrix.matrix2mid import matrix2mid
@@ -154,7 +156,7 @@ def test_function():
 
 dbname = 'aeros'
 user = 'm5242108'
-password = 'Smirk!Underrate7!Mug'
+password = DB_PASS
 host = '163.143.165.136'
 port = '5432'
 
