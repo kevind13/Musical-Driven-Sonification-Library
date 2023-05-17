@@ -29,8 +29,8 @@ print(complete_project_mat[0][:10])
 
 from scipy.stats import zscore
 
-mean = np.mean(complete_project_mat[0])
-std = np.std(complete_project_mat[0])
+mean = np.mean(complete_project_mat)
+std = np.std(complete_project_mat)
 z_scores = zscore(complete_project_mat[0])
 
 x = z_scores * std + mean
@@ -39,12 +39,13 @@ print(z_scores[:10])
 
 print(x[:10])
 
-print(np.mean(z_scores))
-print(np.std(z_scores))
+print('MEAN Z', np.mean(z_scores))
+print('STD Z' ,np.std(z_scores))
 print(np.min(z_scores), np.max(z_scores))
 
-print(mean, std)
-print(np.min(complete_project_mat[0]), np.max(complete_project_mat[0]))
+print('MEAN', mean)
+print('STD', std)
+print(np.min(complete_project_mat), np.max(complete_project_mat))
 
 
 print(f'Cinco estaría mapeado a: {(np.mean(z_scores) + np.std(z_scores) * 5) * std + mean}')

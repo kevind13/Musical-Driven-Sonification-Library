@@ -139,7 +139,10 @@ def range_histogram_of_midi(midi_directory):
             print(midi_path, e)
 
     draw_histogram([x[0] for x in list_of_ranges], title='Histogram of max notes of MIDI files', x_label='Max note number of MIDI files', y_label='Number of notes')
-    draw_histogram([x[1] for x in list_of_ranges], title='Histogram of min notes of MIDI files', x_label='', y_label='Min note number of MIDI files')
+    draw_histogram([x[1] for x in list_of_ranges], title='Histogram of min notes of MIDI files', x_label='Min note number of MIDI files', y_label='Number of notes')
+
+    print(max([x[0] for x in list_of_ranges]))
+    print(min([x[1] for x in list_of_ranges]))
 
 
 def get_midi_key(mid, in_memory = False):
@@ -163,3 +166,39 @@ def get_same_key_midis(midi_directory, key: str):
         if key in key_note:
             list_of_valid_paths.append(midi_path)
     return list_of_valid_paths
+
+
+
+def len_histogram_of_midi_in_base_gcd(midi_directory):
+    list_of_paths = list_of_files_no_depth(midi_directory)
+    max_len = float('-inf')
+    list_of_lengths = []
+    max_file = ''
+    for midi_path in list_of_paths:
+        try:
+            mid = mido.MidiFile(midi_path)
+            tmp_max_len = float('-inf')
+            for track in mid.tracks:
+                tmp_len = 0
+                for i in range(1, len(track)):
+                    if 'note_on' in str(track[i]) or 'note_off' in str(track[i]):
+                        tmp_len += track[i].time
+                tmp_max_len = max(tmp_max_len, tmp_len)
+            temp_gcd, temp_min_delta = gcd_and_min_delta(mid, path=False)
+            temp_value = tmp_max_len/temp_min_delta
+            if temp_value < 750:
+                list_of_lengths.append((temp_value, midi_path))
+        except Exception as e:
+            print(midi_path, e)
+
+    draw_histogram([x[0] for x in list_of_lengths], title='Histogram of Length of MIDI files as a function of individual GCD', x_label='Length of MIDI (ticks(GCD))', y_label='Number of MIDI files')
+    max_non_outlier = find_max_non_outlier([x[0] for x in list_of_lengths])
+    max_len, max_file = max(list_of_lengths)
+    min_len, min_file = min(list_of_lengths)
+    return ({
+        'max_len': max_len,
+        'max_file': max_file,
+        'max_non_outlier': max_non_outlier,
+        'min_len': min_len,
+        'min_file': min_file
+    })

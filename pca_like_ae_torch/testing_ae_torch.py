@@ -1,6 +1,14 @@
+import os
+import sys
+sys.path.append("/Users/kevindiaz/Desktop/SonificationThesis")
+from mid2array.mid2array import mid2arry
+from mid2array.midi_array_utils import compare_midi_arrays
+from mid2matrix.matrix2mid import matrix2mid
 import numpy as np
 
 import warnings
+
+from utils.constants import MIDI_BOTTOM_NOTE, MIDI_GCD_TIME, MIDI_TOP_NOTE
 warnings.filterwarnings('ignore')
 
 import torch
@@ -142,6 +150,15 @@ for index, x in enumerate(testing_dataset):
     # output = np.rint(output).astype(int)
     test_eval[index] = {'input': x.detach().numpy(), 'latent_space': latent_space.detach().numpy(), 'output': output}
 
+    print(test_eval[index]['input'].shape)
+    assert False, 'a'
+    real_midi =  matrix2mid(X_test)
+    pred_midi =  matrix2mid(X_pred)
+
+    _, real = mid2arry(real_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE))
+    _, pred = mid2arry(pred_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE))
+
+    compare_midi_arrays(real, pred, x_label='Ticks / GCD', y_label='MIDI Notes', titles=['Real MIDI', 'Reconstructed MIDI'], legend=True, title='VAE - Comparison between Real and Reconstructed MIDI')
     print(f'{index}')
 
 with open(f'evaluation/{evaluation}.pickle', 'wb') as handle:

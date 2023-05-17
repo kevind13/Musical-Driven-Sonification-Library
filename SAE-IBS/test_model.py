@@ -1,5 +1,11 @@
 import os
 import sys
+sys.path.append("/Users/kevindiaz/Desktop/SonificationThesis")
+
+from mid2array.mid2array import mid2arry
+from mid2array.midi_array_utils import compare_midi_arrays
+from mid2matrix.matrix2mid import matrix2mid
+from utils.constants import MIDI_BOTTOM_NOTE, MIDI_GCD_TIME, MIDI_TOP_NOTE
 
 sys.path.append("/Users/kevindiaz/Desktop/SonificationThesis/SAE-IBS/dataset/")
 os.environ["OMP_DYNAMIC"] = "FALSE"
@@ -15,7 +21,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 import scipy.io as sio
 
-gpu = True
+gpu = False
 if gpu:
     device = torch.device("cuda")
 else:
@@ -27,6 +33,16 @@ torch.manual_seed(69)
 np.random.seed(69)
 cudnn.deterministic = True
 
+def orthogonality(latent):
+    # covariance of embedding
+    cov_emb = np.cov(np.transpose(latent))
+    plt.imshow(cov_emb, cmap='seismic', interpolation='nearest')
+    plt.xlabel("Dimension")
+    plt.ylabel("Dimension")
+    plt.suptitle("Covariance matrix - SAE - 7 Latent dimensions", fontsize=12)
+    # plt.savefig(path + '/Cov_' + run_parameters + '.jpg')
+    plt.show()
+    return cov_emb
 
 def main():
     args = parse_args()
@@ -37,8 +53,9 @@ def main():
 
     path_model = args.out_dir + '/' + args.model_name + '_' + run_parameters + '.tar'
 
+
     print(path_model)
-    checkpoint = torch.load(path_model) 
+    checkpoint = torch.load(path_model, map_location=torch.device(device)) 
     model = checkpoint['model']
     model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -51,6 +68,8 @@ def main():
     pred_data = project_mat['pred_data']
 
     testing_dataset = DataLoader(torch.from_numpy(test_data),batch_size=1,shuffle=False)
+
+    orthogonality(latent_project)
 
     for index, (x) in enumerate(testing_dataset):
         data = x.to(device)
@@ -81,10 +100,20 @@ def main():
 
         print(X_recon[:3])
 
+        real_midi =  matrix2mid(X_test)
+        pred_midi =  matrix2mid(X_pred)
+
+        _, real = mid2arry(real_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE))
+        _, pred = mid2arry(pred_midi, block_size=MIDI_GCD_TIME, truncate_range=(MIDI_BOTTOM_NOTE,MIDI_TOP_NOTE))
+
+        compare_midi_arrays(real, pred, x_label='Ticks / GCD', y_label='MIDI Notes', titles=['Real MIDI', 'Reconstructed MIDI'], legend=True, title='SAE - 7 Latent dimensions - Comparison between Real and Reconstructed MIDI')
+
+        
+
         if index == 3:
             break
 
 if __name__ == '__main__':
     main()
 
-#python test_model.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "AE" --maxNum_epochs 100 --patience 100
+#python test_model.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "SAE" --maxNum_epochs 100 --patience 100
