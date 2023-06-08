@@ -22,6 +22,7 @@ import mido
 import numpy as np
 import pandas as pd
 import psycopg2
+from psycopg2.extras import DictCursor
 import pyaudio
 import scipy.io as sio
 import torch
@@ -44,6 +45,7 @@ port = mido.open_output('IAC Driver Bus 1')
 # play_thread=None
 _play=True
 running = True
+
 
 def play_midi():    
     global audio_reset
@@ -101,20 +103,28 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
     tmp_start_data = start_date
     while running:
         # print("Función ejecutándose...")
-        
+
         # Ejecutar una consulta
-        cursor = db_connection.cursor()
-        query = "SELECT "
-        query += ", ".join([f'AVG({x})' for x in column_names]) 
-        query += " FROM data WHERE time BETWEEN %s AND %s"
-        query += "".join([f' AND {x} BETWEEN 0 and 1' for x in column_names]) 
-        initial_time = start_date
-        final_time = start_date + timedelta(minutes=delta_time)
-        cursor.execute(query, (initial_time, final_time))
-        result = cursor.fetchone()
-            
-    
+        cursor = db_connection.cursor(cursor_factory=DictCursor)
+
+        # query = "SELECT "
+        # query += ", ".join([f'AVG({x})' for x in column_names]) 
+        # query += " FROM data WHERE time BETWEEN %s AND %s"
+        # query += "".join([f' AND {x} BETWEEN 0 and 1' for x in column_names])
+
+        query = """
+            SELECT sname, AVG(pm25) AS average_pm25 FROM data WHERE sname = ANY(%s) AND pm25 >= 0 AND pm25 < 100
+            AND time BETWEEN %s AND %s GROUP BY sname;
+        """
+
+        initial_time = tmp_start_data
+        final_time = tmp_start_data + timedelta(minutes=delta_time)
+        cursor.execute(query, (column_names, initial_time, final_time))
+        results = cursor.fetchall()
         cursor.close()
+
+        result = [row['average_pm25'] for row in results]
+        print(result)
 
         tmp_start_data = tmp_start_data + timedelta(minutes=delta_time)
 
@@ -157,17 +167,16 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
             _play=False
             print('aa')
 
+        if current_midi_events[current_file_index].type == 'note_on' or current_midi_events[current_file_index].type == 'note_off':
+            port.send(mido.Message('note_off', note=current_midi_events[current_file_index].note, velocity=64, time=0))
         current_midi_events = [msg for msg in temp_midi_events]
         # print(current_midi_events[current_file_index].note)
-        port.send(mido.Message('note_off', note=current_midi_events[current_file_index].note, velocity=64, time=0))
         current_file_index = 0
 
         ## REVISAR EL TEMPO Y CALCULAR LA DURACIÓN
         time.sleep(14)
 
 
-def play():
-    pass
 if __name__ == "__main__":
 
     ### PARSER 
@@ -178,7 +187,7 @@ if __name__ == "__main__":
     parser.add_argument("--all_latent_path", type=str, help="File path containint all the latent to get statistics", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/latent/all_latent_project.mat')
 
     parser.add_argument("--orders", nargs="+", type=int, help="List of components to be mapped (integers between 1 and 7)", default=[1,2,3])
-    parser.add_argument("--column_names", nargs="+", type=str, help="List of column names", default=['no', 'no2', 'nox'])
+    parser.add_argument("--column_names", nargs="+", type=str, help="List of station names", default=['no', 'no2', 'nox'])
     parser.add_argument("--start_date", type=str, help="Starting date (YYYY-MM-DD)")
     parser.add_argument("--delta_time", type=int, help="Delta time in minutes")
 
@@ -209,20 +218,92 @@ if __name__ == "__main__":
 
     ### DB CONECTION
 
+    
     db_connection = psycopg2.connect(dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
 
-    cursor = db_connection.cursor()
-    query = "SELECT "
-    query += ", ".join([f'AVG({x}), STDDEV({x})' for x in column_names_list])
-    query += " FROM data WHERE "
-    query += "AND ".join([f'{x} BETWEEN 0 and 1' for x in column_names_list]) 
-    cursor.execute(query)
-    result = cursor.fetchone()
-    db_statistics = {}
-    for i in range(int(len(result) / 2)):
-        db_statistics[column_names_list[i]] = {'avg': result[i*2], 'std': result[(i*2) + 1]}
-    cursor.close()
 
+    '''
+    #this part of the code is to detect the stationsid, the patterns are gotten in Points but this gets the stationsid in the format of the table: data
+
+    cur = db_connection.cursor(cursor_factory=DictCursor)
+    
+    points = [
+        'Point(130.0889357 33.3001304)',
+        'Point(130.4334872 33.5533525)',
+        'Point(130.4349005 33.0344876)',
+        'Point(130.0946999 33.0968652)',
+        'Point(130.5006302 33.510286)',
+        'Point(129.9041873 33.2769087)',
+        'Point(130.3755655 33.3045177)',
+        'Point(130.1504313 33.1849969)'
+    ]
+
+    query = """
+        SELECT stationid
+        FROM stationinfoupdated
+        WHERE ST_DWithin(
+            location::geography,
+            ST_GeomFromText(%s)::geography,
+            0.01
+        );
+    """
+
+    stations_ids = []
+    for point in points:
+        cur.execute(query, (point,))
+        results = cur.fetchall()
+
+        # Process the results
+        for row in results:
+            stations_ids.append(row['stationid'])
+
+    cur.close()
+
+    ## Stations [41204010, 40134510, 41207010, 40221010, 41205080, 41425010]
+    '''
+
+
+    # cursor = db_connection.cursor()
+    # query = "SELECT "
+    # query += ", ".join([f'AVG({x}), STDDEV({x})' for x in column_names_list])
+    # query += " FROM data WHERE "
+    # query += "AND ".join([f'{x} BETWEEN 0 and 1' for x in column_names_list])
+
+    # print(query)
+
+    # cursor.execute(query)
+    # result = cursor.fetchone()
+    # db_statistics = {}
+    # for i in range(int(len(result) / 2)):
+    #     db_statistics[column_names_list[i]] = {'avg': result[i*2], 'std': result[(i*2) + 1]}
+    # cursor.close()
+    # print(db_statistics)
+
+    ## Testing stations
+
+    cur = db_connection.cursor()
+
+    query = """
+        SELECT sname, AVG(pm25), STDDEV(pm25)
+        FROM data
+        WHERE sname IN %s and pm25 >= 0 and pm25 < 100
+        GROUP BY sname;
+    """
+    cur.execute(query, (tuple(column_names_list),))
+    results = cur.fetchall()
+
+    db_statistics = {}
+
+    for row in results:
+        station = row[0]
+        avg_value = row[1]
+        std_value = row[2]
+        db_statistics[station] = {'avg': avg_value, 'std': std_value}
+
+    # Close the cursor and connection
+    cur.close()
+
+    print(db_statistics)
     ### END DB CONECTION AND STATISTICS
 
     ### MODEL LOADING
