@@ -3,7 +3,7 @@ import numpy as np
 import mido
 
 
-def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 128):
+def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 128, tempo: Optional[int] = None):
     '''
         Convert numpy array to MIDI file.
     '''
@@ -15,6 +15,9 @@ def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 12
         track = mido.MidiTrack()
         
         track.append(mido.MetaMessage('time_signature', numerator=4, denominator=4, clocks_per_click=24, notated_32nd_notes_per_beat=8, time=0))
+
+        if tempo:
+            track.append(mido.MetaMessage('set_tempo', tempo=tempo, time=0))
 
         channels = [1,2,3,4]
         count = 0
