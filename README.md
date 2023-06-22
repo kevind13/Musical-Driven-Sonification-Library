@@ -1,36 +1,14 @@
 # SonificationThesis
 Implementation of master's thesis
 
-## TODO
+### Interface to test each latent component
 
-    [] bit arrays
-    [x] change everything to conv3d
-    [x] change everything to conv2d (3d was incorrect)
-    [x] test
-    [x] reduce dimensionality 8 values can be one bit.
-    [x] test with new dimensionality.
-    [x] add test validation.
+`SAE/interface.py`
 
-    [x] plots
-    <!-- [] reduce 68 to 64 --> 
-    [x] padding -> valid
-    [x] train with full data
-    [x] go back bits
-    [x] plot to compare midi plots
-    
-## Time
+### Main function to train SAE
 
-    PCAAE 100rows -> 31 minutes 21.22 seconds
-    PCAEE 3000+ -> 20 hours 0 minutes 26 seconds
-    PCAAE 01 500 rows -> 5 hours
+`SAE/main_SAE.py`
 
-## Questions
-    The different tempo should make difference?
+### Command interface for aeros database
 
-
-
- 
-    [] db integration
-    [] z score
-    [] channels
-    [] different data
+`SAE/command_interface.py`
