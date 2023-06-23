@@ -23,12 +23,15 @@ def find_max_non_outlier(list):
 
 
 def draw_histogram(list, title: Optional[str]= None, x_label: Optional[str]= None, y_label:Optional[str]=None):
+    plt.figure(figsize=(4,4))
     n, bins, patches = plt.hist(x=list, bins='auto', color='#0504aa', alpha=0.7, rwidth=0.85)
     plt.grid(axis='y', alpha=0.75)
 
-    if x_label is not None: plt.xlabel(x_label)
-    if y_label is not None: plt.ylabel(y_label)
-    if title is not None: plt.title(title)
+    if x_label is not None: plt.xlabel(x_label, fontsize=14)
+    if y_label is not None: plt.ylabel(y_label, fontsize=14)
+    # if title is not None: plt.title(title)
     maxfreq = n.max()
+
+    plt.tick_params(axis='both', which='major', labelsize=12)
     plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
     plt.show()
