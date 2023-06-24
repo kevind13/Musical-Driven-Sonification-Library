@@ -117,7 +117,7 @@ for z in latent_project:
     break
 '''
 
-# python main_SAE.py --pretrain_epochs 150 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 7 --model_name "SAE" --maxNum_epochs 150 --patience 100
+# python main_SAE.py --pretrain_epochs 150 --ref_data_dir /home/kevin/autoencoder/SAE/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 7 --model_name "SAE" --maxNum_epochs 150 --patience 100
 
 
 

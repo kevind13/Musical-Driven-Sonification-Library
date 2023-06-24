@@ -34,7 +34,7 @@ note_h = 128
 
 current_params = np.zeros((1,7), dtype=np.float32)
 current_notes = np.zeros((note_h, note_w), dtype=np.uint8)
-current_midi_events = matrix2mid(current_notes.astype(int))
+current_midi_events = matrix2mid(current_notes.astype(int), tempo=750000)
 current_midi_events = [msg for msg in current_midi_events]
 current_midi_size = len(current_midi_events) 
 
@@ -119,6 +119,7 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
 
         initial_time = tmp_start_data
         final_time = tmp_start_data + timedelta(minutes=delta_time)
+        print(column_names, initial_time, final_time)
         cursor.execute(query, (column_names, initial_time, final_time))
         results = cursor.fetchall()
         cursor.close()
@@ -147,7 +148,11 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
             
             latent_current[0][x] = new_z_latent * all_principal_components_statistics[x]['x_std'] + all_principal_components_statistics[x]['x_mean']
 
-        print({'latent modificado' : latent_current, 'latent real' : current_params })
+        print('real latent space:')
+        print(current_params)
+        print('modified latent space:')
+        print(latent_current) 
+        print('')
 
         latent_current = torch.from_numpy(latent_current)
 
@@ -161,11 +166,10 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
         current_notes = np.argmax(X_recon.reshape((-1, X_recon.shape[-1])), axis=-1).reshape((X_recon.shape[1],X_recon.shape[2]))
 
         try:
-            temp_midi_events = matrix2mid(current_notes.astype(int))
+            temp_midi_events = matrix2mid(current_notes.astype(int), tempo=750000)
         except:
             running = False
             _play=False
-            print('aa')
 
         if current_midi_events[current_file_index].type == 'note_on' or current_midi_events[current_file_index].type == 'note_off':
             port.send(mido.Message('note_off', note=current_midi_events[current_file_index].note, velocity=64, time=0))
@@ -174,7 +178,7 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
         current_file_index = 0
 
         ## REVISAR EL TEMPO Y CALCULAR LA DURACIÓN
-        time.sleep(14)
+        time.sleep(22)
 
 
 if __name__ == "__main__":
@@ -184,7 +188,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CHANGE NAME")
     parser.add_argument("--model_path", type=str, help="File path containing the model", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/SAE_3_Layer_7_Latent_9216_2560_512.tar')
     parser.add_argument("--latent_path", type=str, help="File path containing the latent use to sonify", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/latent/latent_project.mat')
-    parser.add_argument("--all_latent_path", type=str, help="File path containint all the latent to get statistics", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/latent/all_latent_project.mat')
+    parser.add_argument("--all_latent_path", type=str, help="File path containig all the latent to get statistics", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/latent/all_latent_project.mat')
 
     parser.add_argument("--orders", nargs="+", type=int, help="List of components to be mapped (integers between 1 and 7)", default=[1,2,3])
     parser.add_argument("--column_names", nargs="+", type=str, help="List of station names", default=['no', 'no2', 'nox'])
@@ -216,12 +220,7 @@ if __name__ == "__main__":
 
     ### END PARSER    
 
-    ### DB CONECTION
-
     
-    db_connection = psycopg2.connect(dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
-
-
     '''
     #this part of the code is to detect the stationsid, the patterns are gotten in Points but this gets the stationsid in the format of the table: data
 
@@ -260,6 +259,7 @@ if __name__ == "__main__":
     cur.close()
 
     ## Stations [41204010, 40134510, 41207010, 40221010, 41205080, 41425010]
+    ['41204010', '40134510', '40202060', '41207010', '40221010', '41205080', '41210010', '41425010']
     '''
 
 
@@ -281,6 +281,7 @@ if __name__ == "__main__":
 
     ## Testing stations
 
+    db_connection = psycopg2.connect(dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
     cur = db_connection.cursor()
 
     query = """

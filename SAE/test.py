@@ -14,9 +14,9 @@ else:
 
 print('Device: ', device)
 
-ref_data_dir = '/home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat'
+ref_data_dir = '/home/kevin/autoencoder/SAE/dataset/timeseries_midi_dataset_all.mat'
 
-savepath = '/home/kevin/autoencoder/SAE-IBS/results/AE/AE_3_Layer_130_Latent_10240_2560_512'
+savepath = '/home/kevin/autoencoder/SAE/results/AE/AE_3_Layer_130_Latent_10240_2560_512'
 checkpoint = torch.load(savepath + '/bestcheckpoint_AE.pt')  # reload best checkpoint
 model = checkpoint['model']
 model.load_state_dict(checkpoint['model_state_dict'])

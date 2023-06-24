@@ -1,0 +1,32 @@
+{
+    "model_name": "SAEIBS",
+    "seed": 69,
+    "train": true,
+    "test": false,
+    "cuda": false,
+    "ref_data_dir": "/Users/kevindiaz/Desktop/SonificationThesis/SAE/dataset/timeseries_midi_dataset_all.mat",
+    "pretrain_model_type": "AE",
+    "actFn": "sigmoid",
+    "batch_size": 256,
+    "maxNum_epochs": 3000,
+    "pretrain_epochs": 100,
+    "patience": 50,
+    "loss_opt": "BCE",
+    "latent_dim": 130,
+    "hidden_dim": [
+        9216,
+        2560,
+        512
+    ],
+    "drop_rate": 0.1,
+    "cond_dropout": false,
+    "optimizer": "Adam",
+    "lr": 0.001,
+    "lr_decay": 0.9999,
+    "decay_step": 1,
+    "weight_decay": 1e-06,
+    "init_weights": false,
+    "work_dir": "/Users/kevindiaz/Desktop/SonificationThesis/SAE",
+    "out_dir": "/Users/kevindiaz/Desktop/SonificationThesis/SAE/results/SAEIBS/SAEIBS_3_Layer_130_Latent_9216_2560_512",
+    "checkpoints_dir": "/Users/kevindiaz/Desktop/SonificationThesis/SAE/results/SAEIBS/SAEIBS_3_Layer_130_Latent_9216_2560_512/checkpoints"
+}

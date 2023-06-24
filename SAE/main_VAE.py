@@ -1,13 +1,13 @@
 import os
 import sys
 
-sys.path.append("/Users/kevindiaz/Desktop/SonificationThesis/SAE-IBS/dataset/")
+sys.path.append("/Users/kevindiaz/Desktop/SonificationThesis/SAE/dataset/")
 os.environ["OMP_DYNAMIC"] = "FALSE"
 os.environ["OMP_NUM_THREADS"] = "1"
 import torch.backends.cudnn as cudnn
 import pandas
 from functions import *
-from model import Autoencoder
+from model import VariationalAutoencoder
 from plot_functions import plot_latent
 from weights import init_weights
 from arguments import parse_args, save_args
@@ -51,7 +51,7 @@ def main():
     # Train AE
     input_dim = X_train.shape[1:]
 
-    model = Autoencoder(input_dim, args.hidden_dim, args.latent_dim, args.cond_dropout, args.drop_rate, args.actFn)
+    model = VariationalAutoencoder(input_dim, args.hidden_dim, args.latent_dim, args.cond_dropout, args.drop_rate, args.actFn)
 
     if args.init_weights:
         model.apply(init_weights)
@@ -64,8 +64,7 @@ def main():
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.decay_step, gamma=args.lr_decay)
 
-    model, train_loss, val_loss, _, = run_AE(model, X_train, X_test, args.batch_size, optimizer, scheduler, device,
-                                             args.maxNum_epochs, args.out_dir, args.patience, args.loss_opt)
+    model, train_loss, val_loss, _, = run_VAE(model, X_train, X_test, args.batch_size, optimizer, scheduler, device, args.maxNum_epochs, args.out_dir, args.patience, 0.1,args.loss_opt)
 
     # Project
     X_project = np.array(random.choices(X_train, k=20))
@@ -92,4 +91,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-#python main_AE.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE-IBS/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "AE" --maxNum_epochs 100 --patience 100
+#python main_VAE.py --pretrain_epochs 10 --ref_data_dir /home/kevin/autoencoder/SAE/dataset/timeseries_midi_dataset_all.mat --batch_size 256 --latent_dim 130 --model_name "VAE" --maxNum_epochs 100 --patience 100

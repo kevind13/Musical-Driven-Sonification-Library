@@ -44,7 +44,7 @@ note_threshold = 32
 use_pca = True
 is_ae = True
 
-background_color = (210, 210, 210)
+background_color = (255, 255, 255)
 edge_color = (60, 60, 60)
 slider_colors = [(90, 20, 20), (90, 90, 20), (20, 90, 20), (20, 90, 90), (20, 20, 90), (90, 20, 90)]
 
@@ -122,7 +122,7 @@ needs_update = False
 current_params = np.zeros((1,num_params), dtype=np.float32)
 current_params_statics = np.copy(current_params)
 current_notes = np.zeros((note_h, note_w), dtype=np.uint8)
-current_midi_events = matrix2mid(current_notes.astype(int))
+current_midi_events = matrix2mid(current_notes.astype(int), tempo=750000)
 current_midi_events = [msg for msg in current_midi_events]
 current_midi_size = len(current_midi_events) 
 current_file_index = 0
@@ -207,7 +207,7 @@ def update_mouse_click(mouse_pos):
         mouse_pressed = 1
 
     if margin*2 <= mouse_pos[0] < margin*2+control_width and ((sliders_height + margin*2 <= mouse_pos[1] < sliders_height + margin*2 + (control_height/2)) or (sliders_height + margin*2 + control_height <= mouse_pos[1] < sliders_height + margin*2 + control_height + (control_height/2))):
-        cur_control_iy = int((mouse_pos[1] - (sliders_height + margin*2)) / (control_height))
+        cur_control_iy = int((mouse_pos[1] - (sliders_height + margin*2)) / (control_height)) 
         mouse_pressed = 2
 
 
@@ -219,7 +219,7 @@ def update_mouse_move(mouse_pos):
         if margin <= mouse_pos[1] <= margin+slider_height:
             val = (float(mouse_pos[1]-margin) / slider_height - 0.5) * (num_sigmas * 2)
             # mapped_range = interpolators[cur_slider_ix][0](val)
-            mapped_range = val * all_principal_components_statistics[cur_slider_ix]['x_std'] + all_principal_components_statistics[cur_slider_ix]['x_mean'] 
+            mapped_range = -1 * val * all_principal_components_statistics[cur_slider_ix]['x_std'] + all_principal_components_statistics[cur_slider_ix]['x_mean'] 
             current_params[0][int(cur_slider_ix)] = mapped_range
             needs_update = True
             audio_reset = True
@@ -252,7 +252,7 @@ def draw_sliders(screen):
 
 
         # val = interpolators[i][1](current_params[0][i])
-        val = (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
+        val = -1 * (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
 
         py = y + int((val / (num_sigmas * 2) + 0.5) * slider_height) - 25
         screen.blit(knob, (int(cx-15), int(py)))
@@ -290,7 +290,7 @@ def draw_text(screen):
 
         y1 = y + slider_height / 2.0 + (10 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y1 = int(y1)
-        text_slider_value_5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * 5:.3f}', True, (0, 0, 0))
+        text_slider_value_5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * -5:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_5.get_rect().height) / 2.0
         screen.blit(text_slider_value_5, (cx_2, y1-text_height))
 
@@ -300,7 +300,7 @@ def draw_text(screen):
         screen.blit(current_param, (cx_2-52, y1 + 20))
 
         ## Current parameter in z-score
-        val = (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
+        val =  (current_params[0][i] - all_principal_components_statistics[i]['x_mean']) / all_principal_components_statistics[i]['x_std']
         current_param = label_font.render(f'{val:.7f}', True, (0, 0, 0))
         text_height = (current_param.get_rect().height) / 2.0
         screen.blit(current_param, (cx_2-52, y1 + 30))
@@ -319,7 +319,7 @@ def draw_text(screen):
 
         y2 = y + slider_height / 2.0 + (0 - num_sigmas) * slider_height / (num_sigmas * 2.0)
         y2 = int(y2)
-        text_slider_value_m5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * -5:.3f}', True, (0, 0, 0))
+        text_slider_value_m5 = label_font.render(f'{all_principal_components_statistics[i]["x_std"] * 5:.3f}', True, (0, 0, 0))
         text_height = (text_slider_value_m5.get_rect().height) / 2.0
         screen.blit(text_slider_value_m5, (cx_2, y2-text_height))
 
@@ -453,7 +453,7 @@ def play():
             current_notes = np.argmax(X_recon.reshape((-1, X_recon.shape[-1])), axis=-1).reshape((X_recon.shape[1],X_recon.shape[2]))
 
             try:
-                temp_midi_events = matrix2mid(current_notes.astype(int))
+                temp_midi_events = matrix2mid(current_notes.astype(int), tempo=750000)
             except:
                 running = False
                 _play=False

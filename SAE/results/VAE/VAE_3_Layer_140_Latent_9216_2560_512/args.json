@@ -1,0 +1,32 @@
+{
+    "model_name": "VAE",
+    "seed": 69,
+    "train": true,
+    "test": false,
+    "cuda": true,
+    "ref_data_dir": "/home/kevin/autoencoder/SAE/dataset/timeseries_midi_dataset_all.mat",
+    "pretrain_model_type": "AE",
+    "actFn": "sigmoid",
+    "batch_size": 256,
+    "maxNum_epochs": 150,
+    "pretrain_epochs": 150,
+    "patience": 100,
+    "loss_opt": "BCE",
+    "latent_dim": 140,
+    "hidden_dim": [
+        9216,
+        2560,
+        512
+    ],
+    "drop_rate": 0.1,
+    "cond_dropout": false,
+    "optimizer": "Adam",
+    "lr": 0.001,
+    "lr_decay": 0.9999,
+    "decay_step": 1,
+    "weight_decay": 1e-06,
+    "init_weights": false,
+    "work_dir": "/home/kevin/autoencoder/SAE",
+    "out_dir": "/home/kevin/autoencoder/SAE/results/VAE/VAE_3_Layer_140_Latent_9216_2560_512",
+    "checkpoints_dir": "/home/kevin/autoencoder/SAE/results/VAE/VAE_3_Layer_140_Latent_9216_2560_512/checkpoints"
+}

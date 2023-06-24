@@ -5,12 +5,12 @@ import json
 import torch.cuda
 
 def parse_args():
-    base = '/Users/kevindiaz/Desktop/SonificationThesis/SAE-IBS/dataset/'
+    base = '/Users/kevindiaz/Desktop/SonificationThesis/SAE/dataset/'
 
-    parser = argparse.ArgumentParser(description='PyTorch SAE-IBS')
+    parser = argparse.ArgumentParser(description='PyTorch SAE')
 
     # general
-    parser.add_argument('--model_name', default='SAEIBS', type=str, help='name of experiment')
+    parser.add_argument('--model_name', default='SAE', type=str, help='name of experiment')
     parser.add_argument('--seed', default=69, type=int, help='set random seed')
     parser.add_argument('--train', default=True, type=bool, help='training mode')
     parser.add_argument('--test', default=False, type=bool, help='test mode')
