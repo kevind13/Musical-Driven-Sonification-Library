@@ -1,6 +1,10 @@
 from music21 import corpus, midi
 import os
 
+'''
+Extraction of chorales adapted from
+https://github.com/feynmanliang/bachbot
+'''
 
 def standardize_key(score):
     """Converts into the key of C major or A minor.
