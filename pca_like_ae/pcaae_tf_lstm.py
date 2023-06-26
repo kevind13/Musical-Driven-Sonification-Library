@@ -26,9 +26,6 @@ class Encoder(layers.Layer):
 
         self.lstm1 = tf.keras.layers.LSTM(64, return_sequences=True, activation='tanh')
         self.lstm2 = tf.keras.layers.LSTM(self.latent_space_dimension, return_sequences=False, activation='tanh')
-        
-        # self.bn = layers.BatchNormalization()
-
 
     def call(self, x):
         x = self.lstm1(x)
@@ -186,11 +183,9 @@ input_shape = X_train[0].shape
 
 training_features = X_train.astype('float32')
 training_dataset = tf.data.Dataset.from_tensor_slices(training_features).batch(10)
-# training_dataset = training_dataset.shuffle(train_loader.shape[0])
 
 testing_features = X_test.astype('float32')
 testing_dataset = tf.data.Dataset.from_tensor_slices(testing_features).batch(10)
-# testing_dataset = testing_dataset.shuffle(test_loader.shape[0])
 
 if autoencoder:
     AE_E = Encoder(latent_space_dimension)

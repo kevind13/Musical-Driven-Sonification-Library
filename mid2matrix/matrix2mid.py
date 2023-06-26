@@ -25,13 +25,13 @@ def matrix2mid(ary, velocity: Optional[int] = 90, block_size: Optional[int] = 12
         previous_val = None
         for i in range(len(new_ary)):
             if new_ary[i] == 0:
-                ## Si tengo ceros entonces los cuento y ya para ponerlos luego.
+                ## If I have zeros then I count them to put them later.
                 zeros += 1
             elif new_ary[i] == previous_val:
-                ## Si el valor es igual al anterior lo voy acumulando
+                ## If the value is equal to the previous one, I accumulate it
                 count += 1
             else:
-                ## Entra cuando cambia de valor en algún momento y tengo dos opciones 
+                ## when it changes value at some point and i have two options
                 if previous_val is not None:
                     track.append(mido.Message('note_on', note=previous_val, velocity=velocity, time=zeros*block_size, channel=channels[track_number]))
                     track.append(mido.Message('note_off', note=previous_val, velocity=0, time=count*block_size, channel=channels[track_number]))

@@ -71,11 +71,9 @@ def play_midi():
             
 
 def map_range(value, from_range, to_range):
-    # Obtener los valores mínimos y máximos de los rangos de entrada y salida
     from_min, from_max = from_range
     to_min, to_max = to_range
 
-    # Convertir el valor en una fracción del rango de entrada y luego escalar esa fracción al rango de salida
     return ((value - from_min) * (to_max - to_min) / (from_max - from_min)) + to_min
 
 def map_range_inverse(value, from_range, to_range):
@@ -102,15 +100,8 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
 
     tmp_start_data = start_date
     while running:
-        # print("Función ejecutándose...")
 
-        # Ejecutar una consulta
         cursor = db_connection.cursor(cursor_factory=DictCursor)
-
-        # query = "SELECT "
-        # query += ", ".join([f'AVG({x})' for x in column_names]) 
-        # query += " FROM data WHERE time BETWEEN %s AND %s"
-        # query += "".join([f' AND {x} BETWEEN 0 and 1' for x in column_names])
 
         query = """
             SELECT sname, AVG(pm25) AS average_pm25 FROM data WHERE sname = ANY(%s) AND pm25 >= 0 AND pm25 < 100
@@ -129,11 +120,7 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
 
         tmp_start_data = tmp_start_data + timedelta(minutes=delta_time)
 
-
-        ### CALCULAR EL TIEMPO ANTERIOR PARA SABER CUANTO TIEMPO SE PONE A DORMIR EXCTO
-
         latent_current = np.array(temp_current_params)
-        # print(latent_current)
 
         for index, x in enumerate(order_list):
             z_latent = (latent_current[0][x] - all_principal_components_statistics[x]['x_mean']) / all_principal_components_statistics[x]['x_std']
@@ -174,17 +161,12 @@ def query_thread(delta_time, start_date, db_connection, column_names, model, cur
         if current_midi_events[current_file_index].type == 'note_on' or current_midi_events[current_file_index].type == 'note_off':
             port.send(mido.Message('note_off', note=current_midi_events[current_file_index].note, velocity=64, time=0))
         current_midi_events = [msg for msg in temp_midi_events]
-        # print(current_midi_events[current_file_index].note)
         current_file_index = 0
 
-        ## REVISAR EL TEMPO Y CALCULAR LA DURACIÓN
         time.sleep(22)
 
 
 if __name__ == "__main__":
-
-    ### PARSER 
-
     parser = argparse.ArgumentParser(description="CHANGE NAME")
     parser.add_argument("--model_path", type=str, help="File path containing the model", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/SAE_3_Layer_7_Latent_9216_2560_512.tar')
     parser.add_argument("--latent_path", type=str, help="File path containing the latent use to sonify", default='results/SAE/SAE_3_Layer_7_Latent_9216_2560_512/latent/latent_project.mat')
@@ -217,9 +199,6 @@ if __name__ == "__main__":
     db_user = args.db_user
     db_password = args.db_password
     db_port = args.db_port
-
-    ### END PARSER    
-
     
     '''
     #this part of the code is to detect the stationsid, the patterns are gotten in Points but this gets the stationsid in the format of the table: data
@@ -262,25 +241,6 @@ if __name__ == "__main__":
     ['41204010', '40134510', '40202060', '41207010', '40221010', '41205080', '41210010', '41425010']
     '''
 
-
-    # cursor = db_connection.cursor()
-    # query = "SELECT "
-    # query += ", ".join([f'AVG({x}), STDDEV({x})' for x in column_names_list])
-    # query += " FROM data WHERE "
-    # query += "AND ".join([f'{x} BETWEEN 0 and 1' for x in column_names_list])
-
-    # print(query)
-
-    # cursor.execute(query)
-    # result = cursor.fetchone()
-    # db_statistics = {}
-    # for i in range(int(len(result) / 2)):
-    #     db_statistics[column_names_list[i]] = {'avg': result[i*2], 'std': result[(i*2) + 1]}
-    # cursor.close()
-    # print(db_statistics)
-
-    ## Testing stations
-
     db_connection = psycopg2.connect(dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
     cur = db_connection.cursor()
 
@@ -305,24 +265,18 @@ if __name__ == "__main__":
     cur.close()
 
     print(db_statistics)
-    ### END DB CONECTION AND STATISTICS
 
-    ### MODEL LOADING
     print("Loading model...")
     checkpoint = torch.load(directory_path, map_location=torch.device('cpu'))  
     model = checkpoint['model']
     model.load_state_dict(checkpoint['model_state_dict'])
-    ###
 
-    ### LATENT LOADING
     project_mat = sio.loadmat(latent_path)
     all_project_mat = sio.loadmat(all_latent_path)
 
     principal_components = project_mat['latent_project']
     all_principal_components = all_project_mat['latent_project']
     all_principal_components = np.transpose(all_principal_components, (1,0))
-
-    # print(all_principal_components.shape)
     
     all_principal_components_statistics = []
     z_scores_components = []
@@ -330,10 +284,9 @@ if __name__ == "__main__":
         z_scores = (x-np.mean(x))/np.std(x)
         z_scores_components.append(z_scores)
         all_principal_components_statistics.append({'x_min' : np.min(x), 'x_max': np.max(x), 'x_mean': np.mean(x), 'x_std': np.std(x), 'z_min' : np.min(z_scores), 'z_max' : np.max(z_scores), 'z_mean' : np.mean(z_scores), 'z_std': np.std(z_scores)})
-    ###
 
-    ### SELECTION OF SONG
-    random_song_ix = 0 ## agregar randomness luego
+
+    random_song_ix = 0 ## If you want can add randomness here.
     current_params = [principal_components[int(random_song_ix)]]
 
     message_thread = threading.Thread(target=query_thread, args=(delta_time_value, start_date_value, db_connection, column_names_list, model, current_params, all_principal_components_statistics, order_list, db_statistics))

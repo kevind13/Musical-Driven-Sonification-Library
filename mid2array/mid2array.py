@@ -142,10 +142,8 @@ def create_all_arrays(path):
 
         sparse_midi_array = sparse.csr_matrix(midi_array)
         sparse.save_npz(file_name_np, sparse_midi_array)
-        # sparse.save_npz(file_name_np_4d, sparse_midi_array)
         print(f'Successfully saved {midi_file}, progression: {index+1}/{number_of_midi_files}')
         break
-        # TODO Continue with all process, but i need to know if this is necesary
 
 
 def create_exploratory_row_data(path):

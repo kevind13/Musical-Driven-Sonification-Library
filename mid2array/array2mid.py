@@ -44,24 +44,19 @@ def array2mid(ary, tempo=None, truncate_range: Optional[tuple[int, int]] = None,
 
             if len(on_notes) == 0 and time_tuple[0] is not None:
                 track.append(mido.Message('note_off', note=time_tuple[0] + bottom_value, velocity=0, time=time_tuple[1]))
-                # print(f'Agregando: note_off, note={time_tuple[0] + bottom_value}, time={time_tuple[1]}, time tuple queda: ({None}, {block_size})')
                 time_tuple = (None, block_size)
             elif len(on_notes) == 0 and time_tuple[0] is None:
-                # print(f'No se agrega nota pues no hay nota y noz había nota antes, time tuple queda: ({None}, {time_tuple[1] + block_size})')
                 time_tuple = (None, time_tuple[1] + block_size)
                 
             elif on_notes[0] != time_tuple[0] and time_tuple[0] is not None:
                 track.append(mido.Message('note_off', note=time_tuple[0] + bottom_value, velocity=0, time=time_tuple[1]))
                 track.append(mido.Message('note_on', note=on_notes[0] + bottom_value, velocity=(velocity or on_notes_vol[0]), time=0))
-                # print(f'Agregando: note_off, note={time_tuple[0] + bottom_value}, time={time_tuple[1]}, note_on, note={on_notes[0] + bottom_value}, time={0} y time tuple queda: ({on_notes[0]}, {block_size})')
                 time_tuple = (on_notes[0], block_size)
                 
             elif on_notes[0] != time_tuple[0] and time_tuple[0] is None:
                 track.append(mido.Message('note_on', note=on_notes[0] + bottom_value, velocity=(velocity or on_notes_vol[0]), time=time_tuple[1]))
-                # print(f'Agregando: note_on, note={on_notes[0] + bottom_value}, time={time_tuple[1]}, time tuple queda: ({on_notes[0]}, {block_size})')
                 time_tuple = (on_notes[0], block_size)
             elif on_notes[0] == time_tuple[0]:
-                # print(f'No se agrega nota pues no cambia la nota, time tuple queda: ({time_tuple[0]}, {time_tuple[1] + block_size})')
                 time_tuple = (time_tuple[0], time_tuple[1] + block_size)
 
         if time_tuple[0] is not None:

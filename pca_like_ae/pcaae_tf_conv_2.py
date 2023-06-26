@@ -6,9 +6,6 @@ import tensorflow as tf
 from tensorflow import keras as K
 import numpy as np
 import scipy.io
-
-# physical_devices = tf.config.list_physical_devices('GPU')
-# tf.config.experimental.set_memory_growth(physical_devices[0], True)
 from collections import deque
 
 batchsize = 4
@@ -18,10 +15,6 @@ EPOCHS = 20
 lr = 0.001
 lambda_cov = 1
 lambda_rec = 1
-
-# list_ds = tf.data.Dataset.list_files('*/*.jpg')
-# load_img = lambda x: tf.io.decode_image(tf.io.read_file(x), channels=3, dtype=tf.float32)
-# ds = list_ds.map(load_img).batch(64)
 
 X_train = np.array(scipy.io.loadmat('exploratory_4_channels_data.mat')['train_data'], dtype=np.float32)
 test_loader = X_train[:8]
@@ -129,24 +122,3 @@ for x in training_dataset:
     break
 
 print(output)
-# if __name__ == '__main__':
-#     for epoch in range(EPOCHS):
-#         reconstruction_loss.reset_states()
-#         print(f'Starting Epoch {epoch}')
-#         for data in training_dataset:
-#             with tf.GradientTape() as tape:
-#                 output = ae(data)
-#                 loss = binary_crossentropy(data, output)
-#                 print(f'\r{loss.numpy():.5f}', end='')
-
-#             gradients = tape.gradient(loss, ae.trainable_variables)
-#             optimizer.apply_gradients(zip(gradients, ae.trainable_variables))
-
-#             reconstruction_loss(loss)
-#         print(data)
-#         print(TEMPLATE.format(epoch + 1, reconstruction_loss.result()))
-#         monitor.append(reconstruction_loss.result())
-
-#         if epoch >= monitor.maxlen and monitor.popleft() < min(monitor):
-#             print(f'Early stopping. No reconstruction loss decrease in {monitor.maxlen - 1} epochs.')
-#             break

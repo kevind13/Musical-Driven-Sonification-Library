@@ -33,15 +33,10 @@ class Encoder(layers.Layer):
         self.bn = layers.BatchNormalization()
 
     def call(self, x):
-        # print(x.get_shape())
         x = self.conv1(x)
-        # print(x.get_shape())
         x = self.conv2(x)
-        # print(x.get_shape())
         x = self.conv3(x)
-        # print(x.get_shape())
         x = self.bn(x)
-        # print(x.get_shape())
         return x
 
 
@@ -68,14 +63,10 @@ class Decoder(layers.Layer):
         self.convT3 = layers.Conv1DTranspose(output_size, kernel_size=self.kernel_size, padding='same')
 
     def call(self, x):
-        # print(z.get_shape())
         x = self.convT1(x)
-        # print(x.get_shape())
         x = self.convT2(x)
-        # print(x.get_shape())
         # Sigmoid activation for final conv layer
         x = self.sigmoid(self.convT3(x))
-        # print(x.get_shape())
 
         return x
 
@@ -184,7 +175,6 @@ def train_PCA_AE(PCAAE_E, PCAAE_D, optimizer, epoch, step, train_ds, test_ds):
         if step > 1:
             test_cov_loss.update_state(loss_cov)
 
-    # ADD TEST
 
     print('PCAAE{} Epoch: {} Train loss: {:.6f},\t Train Data loss: {:.6f},\t Train Cov loss: {:.8f},'.format(
         step, epoch, train_loss.result(), train_content_loss.result(), train_cov_loss.result()))
@@ -217,11 +207,9 @@ input_shape = X_train[0].shape
 training_features = train_loader.astype('float32')
 training_dataset = tf.data.Dataset.from_tensor_slices(train_loader)
 training_dataset = training_dataset.batch(1)
-# training_dataset = training_dataset.shuffle(train_loader.shape[0])
 
 testing_features = test_loader.astype('float32')
 testing_dataset = tf.data.Dataset.from_tensor_slices(test_loader)
-# testing_dataset = testing_dataset.shuffle(test_loader.shape[0])
 
 if autoencoder:
     AE_E = Encoder(input_size, hidden_size1, hidden_size2, latent_space_dimension)

@@ -18,7 +18,7 @@ class Encoder(nn.Module):
         self.drop_rate = drop_rate
         self.activation_fn = activation_fn
 
-        self.zero_mean = nn.BatchNorm1d(self.latent_dim, affine=False, eps=0) ## NOTA: AGREGAR ESTO DISMINUYÓ MUCHISIMO EL LOSS
+        self.zero_mean = nn.BatchNorm1d(self.latent_dim, affine=False, eps=0)
 
         if type(input_dim) is tuple:
             self.input_dim = reduce(lambda x, y: x * y, input_dim)

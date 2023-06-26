@@ -56,6 +56,7 @@ def compare_midi_arrays(real,
             diff_notes = np.multiply(np.where(np.abs(real[i] - reconstructed[i]) > 0, 1, 0), range(1, MIDI_NOTE_RANGE + 1)).max(axis=1)
             print(diff_notes)
             diff_indices = np.where(diff_notes >= 1)[0]
+            ## Add this if you need to mark the errors
             # if len(diff_indices) > 0:
             #     axs[index].plot(diff_indices, diff_notes[diff_indices], marker='s', markersize=10, linestyle='', 
             #     markerfacecolor='none', markeredgecolor='red', label='Differences')
