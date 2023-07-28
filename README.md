@@ -1,4 +1,4 @@
-# SonificationThesis
+# Musical-Driven Sonification Library
 Implementation of master's thesis
 
 ### Interface to test each latent component
